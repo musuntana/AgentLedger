@@ -70,3 +70,5 @@ npx wrangler deploy --dry-run --outdir out/cloudflare/bundle
 5. 如果日志显示入口/资源缺失，请在 GitHub `cloudflare-worker` 门禁查找具体失败文件；如果线上部署显示 404/空白页，再检查域名和 Worker 路由、`assets.directory`，不要将生产部署状态推断为支付成功。
 
 **验收门禁**：同时要求 GitHub `cloudflare-worker` PASS、Cloudflare Workers Builds 的相同 HEAD Check PASS、公开 `/api/healthz` 和 `/demo` 可以访问，才认为“部署成功”。这仍然**不是** Testnet 支付、Agent 执行或链最终性的验收。
+
+**Wrangler 自动准备资源（本轮修复）**：`wrangler.jsonc` 现设 `build.command=node tools/ensure-cloudflare-build.mjs`。即使 Cloudflare 只执行 Deploy / Preview command，Wrangler 也会检查 Studio、Pocket、Pitch 与 manifest 是否完整；缺失时先执行完整 `build:cloudflare`。如果前置 Build command 已经生成完整文件，Wrangler 跳过重复 Expo / Slidev 构建。建议 Cloudflare Build command 使用 `npm run build`，但仍由此钩子兜底资源缺失。首次部署仍需要 Cloudflare 项目自身的合法授权与运行时配额。
