@@ -5,6 +5,7 @@ import { hashTypedData, verifyTypedData } from "viem";
 import { buildApprovalData, assertAddress, assertHex32 } from "../../../lib/approval-format.mjs";
 import { inspectPrecharge } from "../tools/prepare-record.mjs";
 import { reconcileTask } from "./reconcile-task.mjs";
+import { makeClient } from "./task-reader.mjs";
 import { DEFAULT_RPC } from "../../../tools/settlement.mjs";
 
 const requireFact = (condition, reason) => {
@@ -72,7 +73,7 @@ export async function reconcileStoredHint({approval, paymentNonce, expectedPayTo
   const result = await (deps.reconcileTask || reconcileTask)({
     approval, pendingReceipt: expected, expectedPayTo: payee,
   }, {
-    chain: deps.chain,
+    chain: deps.chain ?? makeClient(rpcUrl),
     readTask: deps.readTask,
     verifySettlement: deps.verifySettlement,
     verifySignature,
