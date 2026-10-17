@@ -29,6 +29,21 @@ npm run dev
 
 `npm run dev` 在前台管理它启动的两个服务，按 Ctrl+C 可停止，不会终止其他已占用端口的进程。也可分别运行 `npm start` 和 `npm run deploy:testnet`。
 
+## 部署到 Cloudflare
+
+在 Cloudflare 中连接本仓库，选择生产分支 `master` 和仓库根目录：
+
+| 设置 | 值 |
+| --- | --- |
+| 构建命令 | `npm run build:cloudflare` |
+| 部署命令 | `npx wrangler deploy` |
+| 预览命令 | `npx wrangler preview` |
+| 项目名称 | `monad-hackathon` |
+
+公开演示无需开启访问保护；需要团队登录限制时再配置 Cloudflare Access。构建环境需要 Node.js 22 或更新版本，无需提供钱包私钥。网页和只读接口部署到同一域名；本地交易记录不会迁移到新域名。
+
+构建和离线打包已完成，尚未上传或验收云端部署。详细范围和配置见 [Cloudflare 部署说明](docs/cloudflare-deployment.md)。
+
 ## 先看免钱包演示
 
 打开完整演示，选择开始本地演示。前六步可离线运行，第七步为可选的测试网只读查询。

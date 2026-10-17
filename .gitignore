@@ -14,3 +14,8 @@ sdk/dist/
 .DS_Store
 __MACOSX/
 slides/dist/
+
+# Cloudflare local state and secrets
+.wrangler/
+.dev.vars
+.dev.vars.*

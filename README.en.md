@@ -29,6 +29,21 @@ Signing requires a desktop browser with the MetaMask extension. For remote devel
 
 `npm run dev` manages the two processes it starts and stops them on Ctrl+C. It does not terminate existing services on those ports. To run the services separately, use `npm start` and `npm run deploy:testnet`.
 
+## Deploy to Cloudflare
+
+Connect this repository in Cloudflare, select production branch `master` and use the repository root:
+
+| Setting | Value |
+| --- | --- |
+| Build command | `npm run build:cloudflare` |
+| Deploy command | `npx wrangler deploy` |
+| Preview command | `npx wrangler preview` |
+| Project name | `monad-hackathon` |
+
+For a public demo, leave Cloudflare Access off; enable it for restricted team access. Use Node.js 22 or newer for the build. No wallet private key is needed. Pages and read-only APIs share one origin; local transaction journals do not migrate to that origin.
+
+The build and offline bundle have completed; no Cloudflare upload or hosted acceptance has run. See the [deployment guide](docs/cloudflare-deployment.md) for scope and configuration.
+
 ## Start with the wallet-free demo
 
 Open the guided demo and start the local walkthrough. The first six steps work offline. The seventh is an optional read-only Testnet lookup.

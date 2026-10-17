@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "monad-hackathon",
+  "main": "cloudflare/worker.mjs",
+  "compatibility_date": "2026-10-17",
+  "workers_dev": true,
+  "minify": true,
+  "assets": {
+    "directory": "./out/cloudflare/public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+  "vars": {
+    "MONAD_RPC_URL": "https://testnet-rpc.monad.xyz"
+  }
+}

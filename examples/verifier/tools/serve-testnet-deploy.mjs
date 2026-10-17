@@ -2,28 +2,11 @@
 // Separate, user-signed deployment helper. The verification service stays read-only.
 import { createServer } from 'node:http';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
-import solc from 'solc';
-import { toFunctionSelector } from 'viem';
+import { compileLedger } from './compile-ledger.mjs';
 import { createVerifierHandler } from '../server.mjs';
 
 const root = new URL('../../../', import.meta.url);
-const source = readFileSync(new URL('src/AgentLedger.sol', root), 'utf8');
-const input = { language: 'Solidity', sources: { 'src/AgentLedger.sol': { content: source } },
-  settings: { optimizer: { enabled: true, runs: 200 }, evmVersion: 'shanghai',
-    outputSelection: { '*': { '*': ['abi', 'evm.bytecode.object', 'evm.deployedBytecode.object', 'evm.deployedBytecode.immutableReferences', 'metadata'] } } } };
-const compiled = JSON.parse(solc.compile(JSON.stringify(input)));
-const errors = (compiled.errors || []).filter(error => error.severity === 'error');
-if (errors.length) throw Error(errors.map(error => error.formattedMessage).join('\n'));
-const contract = compiled.contracts['src/AgentLedger.sol'].AgentLedger;
-const artifact = { contractName: 'AgentLedger', compiler: solc.version(), evmVersion: 'shanghai',
-  optimizerRuns: 200, sourceSha256: createHash('sha256').update(source).digest('hex'),
-  abi: contract.abi, bytecode: '0x' + contract.evm.bytecode.object,
-  recorderSelector: toFunctionSelector('paymentRecorder()'),
-  createTaskSelector: toFunctionSelector('createTask(bytes32,bytes32,uint256)'),
-  getTaskSelector: toFunctionSelector('getTask(bytes32)'),
-  immutableReferences: contract.evm.deployedBytecode.immutableReferences,
-  deployedBytecode: '0x' + contract.evm.deployedBytecode.object, metadata: JSON.parse(contract.metadata) };
+const artifact = compileLedger(root);
 mkdirSync(new URL('out/testnet-deploy/', root), { recursive: true });
 writeFileSync(new URL('out/testnet-deploy/AgentLedger.json', root), JSON.stringify(artifact, null, 2) + '\n');
 const assets = new Map([
