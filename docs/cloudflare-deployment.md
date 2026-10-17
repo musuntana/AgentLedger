@@ -72,3 +72,11 @@ npx wrangler deploy --dry-run --outdir out/cloudflare/bundle
 **验收门禁**：同时要求 GitHub `cloudflare-worker` PASS、Cloudflare Workers Builds 的相同 HEAD Check PASS、公开 `/api/healthz` 和 `/demo` 可以访问，才认为“部署成功”。这仍然**不是** Testnet 支付、Agent 执行或链最终性的验收。
 
 **Wrangler 自动准备资源（本轮修复）**：`wrangler.jsonc` 现设 `build.command=node tools/ensure-cloudflare-build.mjs`。即使 Cloudflare 只执行 Deploy / Preview command，Wrangler 也会检查 Studio、Pocket、Pitch 与 manifest 是否完整；缺失时先执行完整 `build:cloudflare`。如果前置 Build command 已经生成完整文件，Wrangler 跳过重复 Expo / Slidev 构建。建议 Cloudflare Build command 使用 `npm run build`，但仍由此钩子兜底资源缺失。首次部署仍需要 Cloudflare 项目自身的合法授权与运行时配额。
+
+## Worker Previews 独立环境配置
+
+Cloudflare 新版 Worker Previews **不会继承生产环境变量**。因此根目录 `wrangler.jsonc` 同时显式声明生产 `vars.MONAD_RPC_URL` 与预览 `previews.vars.MONAD_RPC_URL`，均指向公开 Monad Testnet 只读 RPC。预览绑定不得使用主网端点、含密钥的生产 RPC 或钱包私钥；若改为带凭证的测试节点，使用专属 Preview Secret 而非提交明文 URL。静态资产的 `assets` 配置必须只留在顶层，Cloudflare 会将对应分支的资产上传到 Preview。
+
+仓库新增 `test/cloudflare-preview-config.test.mjs`，由 `npm run test:node` 和 GitHub Actions 自动执行，防止未来意外删掉 Preview RPC。该测试只验证静态配置，**不等于 Worker Preview 已成功创建、云端 RPC 真实可达或支付已完成**。
+
+检查次序：先定位 Cloudflare Workers Builds Check 的首条报错；如 Preview 已生成 URL，在其域名上检查 `/api/healthz`（仅证明服务可达），再针对已知公开任务进行 `/api/task` 只读验收。若 Preview 部署失败但 GitHub dry-run 通过，继续排查 Cloudflare Preview Base 配置、构建授权与账户限制，不能将配置修复表述成已上线。参考 [Cloudflare Worker Previews 配置](https://developers.cloudflare.com/workers/previews/configuration/)。
