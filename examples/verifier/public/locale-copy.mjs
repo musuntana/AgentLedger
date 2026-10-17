@@ -560,4 +560,13 @@ export const COPY = [
   ["NOT ATTRIBUTABLE · read-only Studio spends no gas","无法归因 · 只读工作室不消耗 Gas"],
   ["browser → service → RPC","浏览器 → 服务 → RPC"],
   ["receipt & canonical block checked","回执与规范区块已核对"],
+  // Wallet-free recovery guidance: explanatory copy, never a payment action.
+  ["Lost acknowledgment recovery","响应丢失后的恢复"],
+  ["Lost response: safe recovery","响应丢失：安全恢复"],
+  ["Preserve the original intent","保留原始支付意图"],
+  ["Retain the task, payment nonce, and original transaction hash if available.","保留任务、支付 nonce，以及已知的原交易哈希。"],
+  ["Recheck without spending","只读核对，不再扣费"],
+  ["Read the original transaction and matching chain events; do not send another payment.","核对原始交易与匹配的链上事件，不要再次发起付款。"],
+  ["Hold an uncertain outcome","保持未知结果"],
+  ["Missing evidence means PaymentUnknown, not failed payment or permission to retry.","缺少证据意味着支付结果未知，不代表付款失败，也不授权重试。"],
 ];
