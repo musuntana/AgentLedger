@@ -60,14 +60,15 @@ const VERDICT_LABELS = Object.freeze({
   TAMPER_REJECTED: ['Tampered bytes rejected', '已拒绝被篡改的字节'],
 });
 const OBSERVED_STATES = new Set([
-  'SIMULATED_ONLY','TASK_STATE_OBSERVED','CREATION_RECEIPT_MATCHED',
-  'LOCAL_HASH_MATCH','HASH_MATCH_NOT_EXECUTION',
+  'CREATION_RECEIPT_MATCHED','LOCAL_HASH_MATCH','HASH_MATCH_NOT_EXECUTION',
 ]);
+const LIMITED_STATES = new Set(['SIMULATED_ONLY','TASK_STATE_OBSERVED']);
 export function verdictStateLabel(state, lang = 'en') {
   const pair = VERDICT_LABELS[state];
   return pair ? pair[lang === 'zh' ? 1 : 0] : lang === 'zh' ? '未知状态 · 未验证' : 'Unknown state · not verified';
 }
 export function verdictTone(state) {
   if (state === 'TAMPER_REJECTED') return 'verdict-rejected';
+  if (LIMITED_STATES.has(state)) return 'verdict-limited';
   return OBSERVED_STATES.has(state) ? 'verdict-observed' : 'verdict-unverified';
 }
