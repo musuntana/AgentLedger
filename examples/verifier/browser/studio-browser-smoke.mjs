@@ -53,6 +53,10 @@ try {
   assert((await page.locator("#payment-nonce").innerText()).includes("NOT VERIFIED"),
     "missing nonce uncertainty");
 
+  assert((await page.locator('#verification-matrix-body').innerText()).includes('PAYMENT_UNKNOWN'),
+    'verification matrix cannot promote recorder claim');
+  assert((await page.locator('#verdict-source').innerText()).includes('SIMULATED'),
+    'verdict source must explicitly label simulation');
   await page.locator('[data-scenario="proven"]').click();
   await page.waitForFunction(()=>document.querySelector("#chain-state")?.textContent==="Proven");
   await page.locator("#run-sample-proof").click();
@@ -73,6 +77,9 @@ try {
   assert(report.payment.observedState==="PaymentUnknown","browser falsely reports Paid");
   assert(report.payment.paymentNonce===null,"simulated payment nonce fabricated");
   assert(report.rpc.contacted===false,"simulation reports unexpected public RPC");
+  assert(report.metrics.readPathLatencyMs===null,"simulation fabricated RPC latency");
+  assert(report.metrics.creationReceiptBlockNumber===null,"simulation fabricated receipt block");
+  assert(report.metrics.paymentToEvidenceBlockSpan===null,"simulation fabricated block span");
   assert(report.boundaries.publicTestnetAcceptance==="BLOCKED_NO_REVIEWED_DEPLOYMENT",
     "public acceptance must remain blocked");
   await page.screenshot({path:resolve(outputDir,"studio-desktop.png"),fullPage:true});
@@ -144,6 +151,8 @@ try {
   await page.locator('#guide-next').click();
   await page.waitForFunction(()=>document.querySelector('#verification-message').textContent.includes('EXPECTED REJECTION'));
   assert(await page.locator('#payment-fact').innerText()==='PaymentUnknown','tamper demonstration changed payment fact');
+  assert((await page.locator('#verification-matrix-body').innerText()).includes('TAMPER_REJECTED'),
+    'tamper rejection not surfaced as honest result');
   await page.locator('#guide-next').click();
   await page.waitForFunction(()=>document.querySelector('#scenario-heading').textContent==='Payment response missing');
   await page.waitForFunction(()=>document.querySelector('#guide-result').textContent.includes('Six offline steps complete'));
@@ -151,7 +160,7 @@ try {
   const reference=JSON.parse(readFileSync(new URL('../../../phase0/demo-showcase.json',import.meta.url),'utf8'));
   const fixture={...sample.task,status:'Created',taskId:reference.taskId,contract:reference.contract};
   await page.route(/\/api\/task\?/,route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(fixture)}));
-  await page.route(/\/api\/task-creation\?/,route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({state:'CONFIRMED',chainId:10143,contract:reference.contract,taskId:reference.taskId,transactionHash:reference.creationTransaction,from:fixture.creator,task:fixture,blockNumber:'100'})}));
+  await page.route(/\/api\/task-creation\?/,route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({state:'CONFIRMED',chainId:10143,contract:reference.contract,taskId:reference.taskId,transactionHash:reference.creationTransaction,from:fixture.creator,task:fixture,blockNumber:'100',blockHash:'0x'+'aa'.repeat(32)})}));
   await page.locator('#guide-next').click();
   await page.waitForFunction(()=>document.querySelector('#guide-result').textContent.includes('Guide complete'));
   assert(await page.locator('[data-guide-step="6"][aria-current="step"]').count()===1,"Optional Testnet step not marked");
@@ -159,6 +168,16 @@ try {
   assert((await page.locator('#guide-source').innerText()).includes('OPTIONAL TESTNET'),'Live-source guide label absent');
   assert(await page.locator('#chain-state').innerText()==='Created','mocked live guide result missing');
   assert(await page.locator('#creation-transaction').isVisible(),'creation provenance link missing');
+  assert((await page.locator('#metric-creation-block').innerText()).includes('100'),
+    'canonical receipt block not shown');
+  assert((await page.locator('#metric-read-latency').innerText()).includes('ms'),
+    'measured browser-service-RPC duration not shown');
+  const observedSummaryDownload=page.waitForEvent('download');
+  await page.locator('#save-summary').click();
+  const observedSummary=JSON.parse(readFileSync(await (await observedSummaryDownload).path(),'utf8'));
+  assert(observedSummary.observation.creationReceiptChecked===true,'verified receipt flag absent');
+  assert(observedSummary.metrics.creationReceiptBlockNumber==='100','receipt provenance not exported');
+  assert(observedSummary.metrics.paymentToEvidenceBlockSpan===null,'block span fabricated without payment receipt');
   assert((await page.locator('#share-url').inputValue()).includes(reference.taskId),'live share link missing task identity');
 
   // A delayed local file read must not turn a newly selected mode into a match.
