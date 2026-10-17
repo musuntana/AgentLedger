@@ -53,8 +53,22 @@ try {
   assert((await page.locator("#payment-nonce").innerText()).includes("NOT VERIFIED"),
     "missing nonce uncertainty");
 
-  assert((await page.locator('#verification-matrix-body').innerText()).includes('PAYMENT_UNKNOWN'),
-    'verification matrix cannot promote recorder claim');
+  assert(await page.locator('#verification-matrix-body td[data-state="PAYMENT_UNKNOWN"]').count() === 1,
+    'verification matrix must preserve machine-readable payment uncertainty');
+  assert((await page.locator('#verification-matrix-body').innerText()).includes('Payment outcome unknown'),
+    'judge-facing English verdict missing');
+  assert(await page.locator('.recovery-strip li').count() === 3,
+    'three-stage read-only recovery guidance missing');
+  await page.locator('#language-switch').click();
+  await page.waitForFunction(() => document.documentElement.lang === 'zh-CN');
+  assert((await page.locator('#verification-matrix-body').innerText()).includes('支付结果未知'),
+    'Chinese matrix verdict missing');
+  assert((await page.locator('.recovery-strip').innerText()).includes('只读核对'),
+    'Chinese recovery guidance missing');
+  assert(await page.locator('#verification-matrix-body td[data-state="PAYMENT_UNKNOWN"]').count() === 1,
+    'language switch changed machine payment status');
+  await page.locator('#language-switch').click();
+  await page.waitForFunction(() => document.documentElement.lang === 'en');
   assert((await page.locator('#verdict-source').innerText()).includes('SIMULATED'),
     'verdict source must explicitly label simulation');
   await page.locator('[data-scenario="proven"]').click();
@@ -151,7 +165,7 @@ try {
   await page.locator('#guide-next').click();
   await page.waitForFunction(()=>document.querySelector('#verification-message').textContent.includes('EXPECTED REJECTION'));
   assert(await page.locator('#payment-fact').innerText()==='PaymentUnknown','tamper demonstration changed payment fact');
-  assert((await page.locator('#verification-matrix-body').innerText()).includes('TAMPER_REJECTED'),
+  assert(await page.locator('#verification-matrix-body td[data-state="TAMPER_REJECTED"]').count() === 1,
     'tamper rejection not surfaced as honest result');
   await page.locator('#guide-next').click();
   await page.waitForFunction(()=>document.querySelector('#scenario-heading').textContent==='Payment response missing');
