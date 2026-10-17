@@ -56,3 +56,17 @@ npx wrangler deploy --dry-run --outdir out/cloudflare/bundle
 本次已完成构建及 Wrangler 4.151.1 离线打包，Worker 压缩后约 109 KiB。该结果仅说明构建配置与打包通过，**没有执行 Cloudflare 上传、云端验收、应用测试或钱包交易**。
 
 在 Cloudflare 创建项目并完成首次部署后，应以平台构建日志和实际访问结果判断是否上线成功。应用测试与公开链验收仍为独立步骤。
+
+## Cloudflare 构建失败时先定位阶段
+
+代码库现已提供默认 `npm run build`（等价于 `npm run build:cloudflare`）和根目录 `.node-version`（固定 Node 22，与 CI 一致）。Cloudflare Workers Builds 的默认 Node 主版本会变化；平台可根据 `.node-version` 自动使用指定版本。GitHub `cloudflare-worker` 门禁会完整编译三套网页、检查必需资源并运行 `wrangler deploy --dry-run`；它**不会进行云端上传，也不能检验账号的 token/预览部署权限**。
+
+若 Cloudflare GitHub Check 仍为红色：
+
+1. 点击 GitHub PR 的 **Workers Builds: monad-hackathon** Check → **Details**，进入 Cloudflare 单次构建日志。确认是在 **Install / Build / Deploy / Preview** 哪一步失败，保留第一条真正的 `Error` 及其上下文（不要粘贴密钥）。GitHub Actions 全绿不能代替这一条 Check。
+2. 进入 Cloudflare Worker → **Settings → Build**，确认根目录为仓库根目录、生产分支为 `master`、**Build command** 为 `npm run build` 或 `npm run build:cloudflare`、**Deploy command** 为 `npx wrangler deploy`、**Preview command** 为 `npx wrangler preview`（已启用新版 Preview 时）。不要把 `out/cloudflare/public` 设置成项目根目录。
+3. 检查 Build Variables / Secrets 是否错误覆盖 `NODE_VERSION`；应使用 `22`，与根目录版本文件一致。Cloudflare 默认 Node 24 不再作为本项目的可复现构建前提。
+4. 如果日志显示 **Build 成功但 Deploy/Preview 鉴权失败**，检查 Cloudflare Workers Builds 的连接授权、Build API Token 和 Preview 设置。这属于平台账号设置，改动 GitHub 代码不能代替重新授权。
+5. 如果日志显示入口/资源缺失，请在 GitHub `cloudflare-worker` 门禁查找具体失败文件；如果线上部署显示 404/空白页，再检查域名和 Worker 路由、`assets.directory`，不要将生产部署状态推断为支付成功。
+
+**验收门禁**：同时要求 GitHub `cloudflare-worker` PASS、Cloudflare Workers Builds 的相同 HEAD Check PASS、公开 `/api/healthz` 和 `/demo` 可以访问，才认为“部署成功”。这仍然**不是** Testnet 支付、Agent 执行或链最终性的验收。
