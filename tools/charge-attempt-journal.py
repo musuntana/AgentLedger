@@ -86,6 +86,17 @@ def connect(db_path):
             time.sleep(0.05)
     raise RuntimeError("unreachable")
 
+def connect_readonly(db_path):
+    """Read the existing precharge DB, never create or migrate one."""
+    path = Path(db_path).resolve()
+    if not path.is_file():
+        raise ValueError("precharge database unavailable; PaymentUnknown / NO RECHARGE")
+    db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=10)
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA query_only=ON")
+    return db
+
+
 def reserve(db, payload):
     value = validate(payload)
     db.execute("BEGIN IMMEDIATE")
@@ -185,23 +196,35 @@ def inspect(db, payment_nonce):
                      (payment_nonce,)).fetchone()
     if row is None:
         raise ValueError("no precharge reservation exists for this authorization")
-    hint = db.execute("SELECT * FROM transaction_hints WHERE payment_nonce=?",
-                      (payment_nonce,)).fetchone()
+    # A legacy precharge DB predating the hint table is valid but carries no hint.
+    try:
+        hint = db.execute("SELECT * FROM transaction_hints WHERE payment_nonce=?",
+                          (payment_nonce,)).fetchone()
+    except sqlite3.OperationalError as exc:
+        if "no such table: transaction_hints" not in str(exc):
+            raise
+        hint = None
     return {"result": "PRECHARGE_RECORD_FOUND", "admission": dict(row),
             "unverifiedTransactionHint": dict(hint) if hint is not None else None,
             "paymentStatus": "PaymentUnknown", "chargeAgain": False}
 
 def main(args):
-    if args not in (["reserve"], ["attach-hint"]) and not (len(args) == 2 and args[0] == "inspect"):
-        raise ValueError("usage: charge-attempt-journal.py reserve | attach-hint | inspect PAYMENT_NONCE")
+    if args not in (["reserve"], ["attach-hint"]) and not (
+        len(args) == 2 and args[0] in ("inspect", "inspect-readonly")
+    ):
+        raise ValueError("usage: charge-attempt-journal.py reserve | attach-hint | inspect-readonly PAYMENT_NONCE | inspect PAYMENT_NONCE")
     path = os.environ.get("AGENTLEDGER_CHARGE_DB", "receipts/charge-attempts.db")
-    with connect(path) as db:
-        if args == ["reserve"]:
-            result = reserve(db, json.load(sys.stdin))
-        elif args == ["attach-hint"]:
-            result = attach_hint(db, json.load(sys.stdin))
-        else:
+    if len(args) == 2 and args[0] == "inspect-readonly":
+        with connect_readonly(path) as db:
             result = inspect(db, args[1])
+    else:
+        with connect(path) as db:
+            if args == ["reserve"]:
+                result = reserve(db, json.load(sys.stdin))
+            elif args == ["attach-hint"]:
+                result = attach_hint(db, json.load(sys.stdin))
+            else:
+                result = inspect(db, args[1])
     print(json.dumps(result, sort_keys=True))
     # Conflict must be an error, otherwise middleware may settle again.
     if args == ["reserve"] and result["result"] != "RESERVED_FIRST_ATTEMPT":

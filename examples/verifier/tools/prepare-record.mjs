@@ -19,7 +19,7 @@ export function inspectPrecharge(paymentNonce, opts = {}) {
   if (!/^0x[0-9a-f]{64}$/.test(paymentNonce || "")) {
     throw Error("verified settlement missing EIP-3009 payment nonce");
   }
-  const job = spawnSync(opts.python || "python3", [prechargeScript, "inspect", paymentNonce], {
+  const job = spawnSync(opts.python || "python3", [prechargeScript, "inspect-readonly", paymentNonce], {
     encoding: "utf8", maxBuffer: 1_048_576, timeout: 15_000,
     env: { ...process.env, AGENTLEDGER_CHARGE_DB: opts.dbPath ||
       process.env.AGENTLEDGER_CHARGE_DB || prechargePath },
