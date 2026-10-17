@@ -44,3 +44,30 @@ export function verificationMatrix({
       state: "NOT_VERIFIED" },
   ];
 }
+
+ 
+// Machine-readable states are stable for tests/exports, but are not appropriate
+// as judge-facing copy. Unknown new states fail closed instead of looking green.
+const VERDICT_LABELS = Object.freeze({
+  NOT_RUN: ['Not checked', '尚未检查'],
+  NOT_VERIFIED: ['Not verified', '尚未验证'],
+  PAYMENT_UNKNOWN: ['Payment outcome unknown', '支付结果未知'],
+  SIMULATED_ONLY: ['Local simulation only', '仅本地模拟'],
+  TASK_STATE_OBSERVED: ['Task state observed', '已观察任务状态'],
+  CREATION_RECEIPT_MATCHED: ['Creation receipt matched', '创建回执已匹配'],
+  LOCAL_HASH_MATCH: ['Local bytes matched', '本地字节匹配'],
+  HASH_MATCH_NOT_EXECUTION: ['Digest matched · not execution proof', '摘要匹配 · 不代表执行正确'],
+  TAMPER_REJECTED: ['Tampered bytes rejected', '已拒绝被篡改的字节'],
+});
+const OBSERVED_STATES = new Set([
+  'SIMULATED_ONLY','TASK_STATE_OBSERVED','CREATION_RECEIPT_MATCHED',
+  'LOCAL_HASH_MATCH','HASH_MATCH_NOT_EXECUTION',
+]);
+export function verdictStateLabel(state, lang = 'en') {
+  const pair = VERDICT_LABELS[state];
+  return pair ? pair[lang === 'zh' ? 1 : 0] : lang === 'zh' ? '未知状态 · 未验证' : 'Unknown state · not verified';
+}
+export function verdictTone(state) {
+  if (state === 'TAMPER_REJECTED') return 'verdict-rejected';
+  return OBSERVED_STATES.has(state) ? 'verdict-observed' : 'verdict-unverified';
+}
