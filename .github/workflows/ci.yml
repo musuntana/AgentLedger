@@ -124,7 +124,7 @@ jobs:
       - name: Install workspace dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Build all Cloudflare assets (Studio, Pitch and Pocket)
-        run: npm run build:cloudflare
+        run: npm run build
       - name: Check asset manifest and required routes
         run: |
           node -e "const fs=require('node:fs'); const p='out/cloudflare/public/'; for(const f of ['studio.html','workbench.html','verdict-matrix.mjs','pocket/index.html','pitch/index.html','pitch/en/index.html']) {if(!fs.existsSync(p+f)) throw Error('missing asset: '+f)}"
