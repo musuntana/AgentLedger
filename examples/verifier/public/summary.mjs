@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // Common read-only report contract for the browser Studio and hermetic CLI.
 // A simulated snapshot can NEVER represent a real Testnet payment.
+import { observationMetrics } from './verdict-matrix.mjs';
 export const SUMMARY_SCHEMA="agentledger.demo.summary.v1";
 export const RPC_LABEL="https://testnet-rpc.monad.xyz/"; // identity only, not contacted for simulations
-export function makeSummary(task,{simulation=true,payment=null,verification="NOT_RUN",scenario=null}={}) {
+export function makeSummary(task,{simulation=true,payment=null,verification="NOT_RUN",scenario=null,observation=null}={}) {
   if(!task || typeof task!=="object" || !/^0x[0-9a-fA-F]{64}$/.test(task.taskId||"") ||
     !/^0x[0-9a-fA-F]{64}$/.test(task.descriptionHash||"") ||
     !/^0x[0-9a-fA-F]{40}$/.test(task.contract||"") || task.chainId!==10143) {
     throw Error("Cannot summarize a mismatched/unknown task identity");
   }
   const proof=payment||{};
+  const metrics=observationMetrics({simulation,readPathLatencyMs:observation?.readPathLatencyMs,creation:observation?.creation});
   // Never turn a Recorder claim into independent USDC settlement.
   if(proof.eventIndependentlyChecked===true) {
     throw Error("Studio cannot certify independently checked payment from a simulation or bare task read");
@@ -18,6 +20,14 @@ export function makeSummary(task,{simulation=true,payment=null,verification="NOT
     schemaVersion:SUMMARY_SCHEMA,mode:simulation?"LOCAL_SIMULATION":"TESTNET_TASK_READ_ONLY",
     outcome:simulation?"SIMULATED_OBSERVATION_NOT_PUBLIC_ACCEPTANCE":"TASK_ONLY_NOT_SETTLEMENT_ACCEPTANCE",
     scenario,chainId:10143,contract:task.contract.toLowerCase(),
+    observation:{
+      observedAt:simulation?null:observation?.observedAt??null,
+      creationTransaction:metrics.creationReceiptBlockNumber===null?null:observation?.creation?.transactionHash??null,
+      creationReceiptChecked:metrics.creationReceiptBlockNumber!==null,
+      creationBlock:metrics.creationReceiptBlockNumber,
+      creationBlockHash:metrics.creationReceiptBlockHash,
+    },
+    metrics,
     rpc:{
       pinnedIdentifier:RPC_LABEL,
       contacted:!simulation,
