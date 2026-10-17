@@ -28,3 +28,18 @@
  .payment-layout .scope-details{order:7}
 }
 @media(min-width:801px) and (max-width:850px){.workspace-mobile-nav{display:flex;gap:8px;padding:10px 20px;background:#fff;border-bottom:1px solid var(--line)}.workspace-mobile-nav a{font-size:12px;padding:6px;color:#3f5e86}}
+
+
+/* Judge-facing verification ledger: source and null results must stay legible. */
+.start-here{margin-top:24px;align-items:end}.start-here h2{margin:4px 0 0;font-size:22px;font-weight:660;letter-spacing:-.5px}
+.honest-results{margin-top:32px}.verdict-intro{margin:0 0 18px;max-width:72ch}.honest-results .director-source{align-self:center;white-space:normal;text-align:right}
+.results-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:stretch}.results-grid>.panel{min-width:0;padding:22px;border:1px solid #d8e2ee;border-radius:12px;background:#fff}
+.results-grid h3{font-size:17px;font-weight:650;letter-spacing:-.3px;margin:0 0 14px}.matrix-scroll{overflow-x:auto}.verdict-table{border-collapse:collapse;width:100%;min-width:495px;text-align:left;font-size:12px;line-height:1.5}
+.verdict-table th{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#60738b;background:#f2f6fc;padding:11px 9px;white-space:nowrap}
+.verdict-table td{padding:12px 9px;vertical-align:top;border-bottom:1px solid #e7edf5;color:#344c68;overflow-wrap:anywhere}.verdict-table tbody tr:last-child td{border-bottom:0}
+.verdict-table td:first-child{font-weight:700;color:#243f65}.verdict-table .verdict-unverified{color:#926224;font-weight:730}.verdict-table .verdict-rejected{color:#a34142;font-weight:730}.verdict-table .verdict-observed{color:#246b5a;font-weight:730}
+.result-emphasis{border-left:3px solid #cb8a35;background:#fff8ec;padding:11px 13px;line-height:1.6;color:#775224;font-weight:730;font-size:12px;margin:0 0 18px}
+.metric-grid{margin:0}.metric-grid>div{display:grid;grid-template-columns:minmax(90px,43%) minmax(0,1fr);gap:8px;border-bottom:1px solid #e7edf5;padding:11px 0;font-size:12px;line-height:1.6}
+.metric-grid dt{color:#667993}.metric-grid dd{margin:0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;font-weight:650;color:#28425f}.limits-foot{font-size:12px;line-height:1.65;color:#765d3b;margin:16px 0 0}
+@media(max-width:960px){.results-grid{grid-template-columns:1fr}.honest-results .director-source{text-align:left}}
+@media(max-width:650px){.start-here{display:block}.results-grid>.panel{padding:16px}.metric-grid>div{grid-template-columns:1fr;gap:1px}}
