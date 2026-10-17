@@ -27,7 +27,7 @@ for (const [path, file, type] of [
     ['/mon/' + name + '.mjs', 'mon/' + name + '.mjs', 'text/javascript; charset=utf-8']),
 ]) assets.set(path, [file, type]);
 const verifierHandler = createVerifierHandler();
-const studioPaths = new Set(['/studio', '/demo', '/app.mjs', '/demo-scenarios.mjs', '/demo-guide.mjs', '/text-stats.mjs', '/summary.mjs', '/evidence-browser.mjs', '/locale.mjs', '/locale-copy.mjs']);
+const studioPaths = new Set(['/studio', '/demo', '/app.mjs', '/demo-scenarios.mjs', '/demo-guide.mjs', '/text-stats.mjs', '/summary.mjs', '/verdict-matrix.mjs', '/evidence-browser.mjs', '/locale.mjs', '/locale-copy.mjs']);
 const server = createServer((req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
   if (studioPaths.has(path) || path.startsWith('/api/')) {
@@ -59,6 +59,6 @@ const server = createServer((req, res) => {
 const port = Number(process.env.AGENTLEDGER_DEPLOY_PORT || 4322);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw Error('AGENTLEDGER_DEPLOY_PORT must be 1..65535');
 server.listen(port, '127.0.0.1', () => {
-  console.log(`Compiled ${artifact.compiler}; ${contract.evm.bytecode.object.length / 2} bytes; source SHA-256 ${artifact.sourceSha256}`);
+  console.log(`Compiled ${artifact.compiler}; ${(artifact.bytecode.length - 2) / 2} bytes; source SHA-256 ${artifact.sourceSha256}`);
   console.log(`MetaMask deployment: http://127.0.0.1:${port} (Monad Testnet 10143 only)`);
 });
