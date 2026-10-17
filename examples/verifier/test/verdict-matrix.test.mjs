@@ -70,4 +70,6 @@ test("judge-facing verdict labels are bilingual while machine codes stay unchang
   assert.equal(verdictTone("PAYMENT_UNKNOWN"), "verdict-unverified");
   assert.equal(verdictTone("TAMPER_REJECTED"), "verdict-rejected");
   assert.equal(verdictTone("CREATION_RECEIPT_MATCHED"), "verdict-observed");
+  assert.equal(verdictTone("SIMULATED_ONLY"), "verdict-limited");
+  assert.equal(verdictTone("TASK_STATE_OBSERVED"), "verdict-limited");
 });
