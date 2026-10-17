@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 // Package only public browser assets, never out/, journals, env files or receipts.
 import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises';
+import { buildCloudflareApps, publishCloudflareApps } from './build-cloudflare-apps.mjs';
 import { compileLedger } from '../examples/verifier/tools/compile-ledger.mjs';
 
 const root = new URL('../', import.meta.url);
 const destination = new URL('out/cloudflare/public/', root);
 // Compile before replacing the dedicated generated asset directory.
 const artifact = compileLedger(root);
+const sites = await buildCloudflareApps();
 await rm(destination, { recursive: true, force: true });
 await mkdir(new URL('mon/', destination), { recursive: true });
 const copies = [
@@ -25,5 +27,7 @@ const copies = [
 ];
 await Promise.all(copies.map(([source, name]) => copyFile(new URL(source, root), new URL(name, destination))));
 await writeFile(new URL('artifact.json', destination), JSON.stringify(artifact) + '\n');
+await publishCloudflareApps(sites, destination);
+console.log('Pocket and Chinese/English pitch assets ready at /pocket/, /pitch/ and /pitch/en/.');
 console.log(`Cloudflare assets ready: ${copies.length + 1} files in out/cloudflare/public/`);
 console.log(`Compiler ${artifact.compiler}; source SHA-256 ${artifact.sourceSha256}`);

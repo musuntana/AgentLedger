@@ -176,7 +176,9 @@ function Phone({stage,setStage,observed,onObserve,onVerified,onExport,exportNoti
   setLookupBusy(true);setLookupState("Reading task only; payment remains unknown");
   onObserve(null);clearLocalEvidence();
   try{
-   const source=process.env.EXPO_PUBLIC_VERIFIER_URL||"http://127.0.0.1:4321";
+   const configured=process.env.EXPO_PUBLIC_VERIFIER_URL;
+   const source=configured==="same-origin"&&Platform.OS==="web"
+     ? window.location.origin : configured||"http://127.0.0.1:4321";
    const result=await observeTaskReadOnly(contract.trim(),taskId.trim(),source);
    if(epoch!==lookupEpoch.current)return;
    onObserve(result.task);
@@ -260,7 +262,7 @@ function Phone({stage,setStage,observed,onObserve,onVerified,onExport,exportNoti
     </View>
     <InfoHeader index="02" title={t("Observe on Testnet","查询测试网任务")} sub={t("Inspect an address without signing or spending gas.","只读查询 · 无需签名或 Gas")}/>
     <View style={s.card}>
-     <Text style={s.small}>{t("Local verifier supports GET only. Paid/Proven does not prove USDC settlement. No reviewed deployment: public acceptance blocked.","本地 verifier 代理只支持 GET。任务 Paid/Proven 不是支付证明；无 reviewed deployment 仍禁止公共验收。")}</Text>
+     <Text style={s.small}>{t("The verifier supports read-only task lookups. Paid/Proven does not establish USDC settlement; public payment acceptance remains unverified.","验证服务仅查询任务。Paid/Proven 不代表 USDC 支付已结算；公开支付验收仍未完成。")}</Text>
      <TextInput accessibilityLabel={l("Ledger contract")} autoCapitalize="none"
       autoCorrect={false} value={contract} onChangeText={value=>{lookupEpoch.current++;setContract(value);onObserve(null);setLookupBusy(false);clearLocalEvidence();}}
       placeholder={l("Contract 0x…")} placeholderTextColor={C.sub} style={s.field}/>
@@ -363,7 +365,7 @@ function Inspector({fact,observed,verification,onExport,exportNotice}:{fact:Demo
   <View style={s.inspectorBrand}><Mark size={38}/><View><Text style={s.inspectorEyebrow}>{l("AGENTLEDGER / REVIEW DESK")}</Text><Text style={s.inspectorBrandSub}>{l("READ-ONLY OBSERVATION CONSOLE")}</Text></View></View>
   <Text style={s.eyebrow}>{l("JUDGE / EVIDENCE VIEW")}</Text><Text style={s.h2}>{l("Every claim has a boundary.")}</Text><Text style={s.inspectorIntro}>{l("Inspect the observed facts, their sources and what still needs independent verification.")}</Text>
   <View style={[s.notice,{marginTop:18}]}><Text style={{color:C.amber,fontWeight:"700"}}>{l(isLive?"TESTNET TASK ONLY · PAYMENT UNKNOWN":"LOCAL SIMULATION · NOT TESTNET ACCEPTED")}</Text><Text style={s.small}>{l(isLive?"Task fetched read-only via verifier. Payment not independently accepted.":"No RPC contacted. No funds spent. No real payment verified.")}</Text></View>
-  <InfoHeader index="01" title={l("Chain context")}/><Row label={l("Chain ID")} value={l(isLive?"10143 (task read)":"10143 (simulated)")}/><Row label={l("Contract")} value={shorten(observed?.contract??fact.ledger)}/><Row label={l("RPC identity")} value={l(isLive?"local GET verifier → Monad RPC":"testnet-rpc.monad.xyz (label only)")}/><Row label={l("Task ID")} value={shorten(observed?.taskId??fact.taskId)}/><Row label={l("Description")} value={shorten(observed?.descriptionHash??fact.descriptionHash)}/>
+  <InfoHeader index="01" title={l("Chain context")}/><Row label={l("Chain ID")} value={l(isLive?"10143 (task read)":"10143 (simulated)")}/><Row label={l("Contract")} value={shorten(observed?.contract??fact.ledger)}/><Row label={l("RPC identity")} value={l(isLive?"read-only verifier → Monad RPC":"testnet-rpc.monad.xyz (label only)")}/><Row label={l("Task ID")} value={shorten(observed?.taskId??fact.taskId)}/><Row label={l("Description")} value={shorten(observed?.descriptionHash??fact.descriptionHash)}/>
   <InfoHeader index="02" title={l("Read-only assertions")}/>{assertions.map(([title,detail,ok])=><View key={title} style={s.assertion}><Text style={{color:ok?C.mint:C.amber,fontWeight:"800"}}>{ok?"✓":"○"}</Text><View style={{flex:1}}><Text style={s.stepTitle}>{title}</Text><Text style={s.small}>{detail}</Text></View></View>)}
   <InfoHeader index="03" title={l("summary.json preview")}/><View style={s.jsonBox}><Text style={s.json} selectable>{JSON.stringify(report,null,2)}</Text></View>
   <Button title={l("Export summary.json")} secondary onPress={onExport}/>

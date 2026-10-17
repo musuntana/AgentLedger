@@ -34,7 +34,7 @@ const messages:Record<string,string>={
  "hash available; bytes unchecked":"已有哈希，字节未核验","SHA-256 MATCH (payment unknown)":"SHA-256 匹配（支付未知）",
  " · NOT payment proof":" · 不是付款证明","RPC task identity · Chain 10143 · read-only":"RPC 任务身份 · 链 10143 · 只读",
  "10143 (task read)":"10143（任务只读）","10143 (simulated)":"10143（模拟）",
- "local GET verifier → Monad RPC":"本地 GET 验证服务 → Monad RPC","testnet-rpc.monad.xyz (label only)":"testnet-rpc.monad.xyz（仅标识）",
+ "read-only verifier → Monad RPC":"只读验证服务 → Monad RPC","testnet-rpc.monad.xyz (label only)":"testnet-rpc.monad.xyz（仅标识）",
  "summary.json preview":"summary.json 预览",
  "Read-only evidence viewer · No signing, payment, execution or automatic recharge.":"只读证据查看器 · 不签名、不付款、不执行、不重扣。",
  "summary.json · local download/share opened":"summary.json · 已打开本地下载或分享",

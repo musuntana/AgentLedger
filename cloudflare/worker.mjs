@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Fetch-native adapter. The Worker has read-only chain access and serves browser
 // assets. Wallet signatures and transaction journals remain in the user's browser.
+import siteManifest from '../out/cloudflare/site-manifest.json';
 import { makeClient, readTask } from '../examples/verifier/lib/task-reader.mjs';
 import { observeTaskCreation } from '../examples/verifier/lib/task-creation.mjs';
 
@@ -24,6 +25,28 @@ const ROUTES = new Map([
   ...['app', 'abi', 'sha256', 'mon-evidence', 'pipeline', 'journal']
     .map(name => ['/mon/' + name + '.mjs', '/mon/' + name + '.mjs']),
 ]);
+// Longest base wins so /pitch/en/ remains distinct from the Chinese pitch.
+const SITES = Object.entries(siteManifest).sort(([a], [b]) => b.length - a.length)
+  .map(([base, data]) => ({ base, ...data, allowed: new Set(data.files) }));
+function siteCsp(site) {
+  // Production exports can contain small inline bootstraps. Authorize exact
+  // build-time hashes; only styles need inline rules for React Native Web/Vue.
+  return "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; " +
+    "script-src 'self' " + site.scriptHashes.join(' ') + "; " +
+    "style-src 'self' 'unsafe-inline'; font-src 'self' data:; " +
+    "connect-src 'self' blob:; img-src 'self' data: blob:; media-src 'self' blob:; object-src 'none';";
+}
+async function serveAsset(request, env, asset, csp = HEADERS['content-security-policy']) {
+  const assetUrl = new URL(request.url); assetUrl.pathname = asset; assetUrl.search = '';
+  try {
+    const response = await env.ASSETS.fetch(new Request(assetUrl, { method: request.method }));
+    const headers = new Headers(response.headers);
+    for (const [name, value] of Object.entries(HEADERS)) headers.set(name, value);
+    headers.set('content-security-policy', csp);
+    return new Response(request.method === 'HEAD' ? null : response.body,
+      { status: response.status, headers });
+  } catch { return json({ error: 'Assets unavailable' }, 503); }
+}
 const CREATION_ERRORS = new Set(['WRONG_CHAIN', 'CREATION_REVERTED', 'RECEIPT_MISMATCH',
   'TRANSACTION_MISMATCH', 'NOT_TASK_CREATION', 'TASK_ID_MISMATCH',
   'CREATION_EVENT_MISMATCH', 'TASK_READBACK_MISMATCH', 'CREATION_BLOCK_CHANGED']);
@@ -64,15 +87,24 @@ export default {
         return json({ error: 'Chain lookup failed: confirm network, contract and task ID' }, 502);
       }
     }
+    for (const site of SITES) {
+      if (url.pathname === site.base.slice(0, -1)) {
+        const target = new URL(request.url); target.pathname = site.base;
+        return new Response(null, { status: 308, headers: { ...HEADERS, location: target.href } });
+      }
+      if (!url.pathname.startsWith(site.base)) continue;
+      if (site.allowed.has(url.pathname)) return serveAsset(request, env, url.pathname, siteCsp(site));
+      const suffix = url.pathname.slice(site.base.length);
+      // Slidev routes include numbered slides, overview and presenter views.
+      // Never serve an HTML fallback for a missing JS/CSS/font/image request.
+      const navigation = request.headers.get('accept')?.includes('text/html');
+      if (!suffix || (navigation && !/\.[^/]+$/.test(suffix))) {
+        return serveAsset(request, env, site.base + 'index.html', siteCsp(site));
+      }
+      return json({ error: 'Not found' }, 404);
+    }
     const asset = ROUTES.get(url.pathname);
     if (!asset) return json({ error: 'Not found' }, 404);
-    const assetUrl = new URL(request.url); assetUrl.pathname = asset; assetUrl.search = '';
-    try {
-      const response = await env.ASSETS.fetch(new Request(assetUrl, { method: request.method }));
-      const headers = new Headers(response.headers);
-      for (const [name, value] of Object.entries(HEADERS)) headers.set(name, value);
-      return new Response(request.method === 'HEAD' ? null : response.body,
-        { status: response.status, headers });
-    } catch { return json({ error: 'Assets unavailable' }, 503); }
+    return serveAsset(request, env, asset);
   },
 };
