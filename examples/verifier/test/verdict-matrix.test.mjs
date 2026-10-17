@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildDemoCase } from "../public/demo-scenarios.mjs";
 import { makeSummary } from "../public/summary.mjs";
-import { observationMetrics, verificationMatrix } from "../public/verdict-matrix.mjs";
+import { observationMetrics, verificationMatrix, verdictStateLabel, verdictTone } from "../public/verdict-matrix.mjs";
 
 const tx = "0x" + "af".repeat(32);
 const block = "0x" + "bc".repeat(32);
@@ -59,4 +59,15 @@ test("unconfirmed or malformed receipts stay null; tamper is not a successful pr
   const matrix = verificationMatrix({task: fixture.task, verification: "TAMPER_REJECTED"});
   assert.equal(matrix[2].state, "TAMPER_REJECTED");
   assert.equal(matrix[1].state, "PAYMENT_UNKNOWN");
+});
+
+test("judge-facing verdict labels are bilingual while machine codes stay unchanged", () => {
+  assert.equal(verdictStateLabel("PAYMENT_UNKNOWN", "en"), "Payment outcome unknown");
+  assert.equal(verdictStateLabel("PAYMENT_UNKNOWN", "zh"), "支付结果未知");
+  assert.equal(verdictStateLabel("HASH_MATCH_NOT_EXECUTION", "zh"), "摘要匹配 · 不代表执行正确");
+  assert.equal(verdictStateLabel("UNKNOWN_NEW_STATE", "zh"), "未知状态 · 未验证");
+  assert.equal(verdictTone("UNKNOWN_NEW_STATE"), "verdict-unverified");
+  assert.equal(verdictTone("PAYMENT_UNKNOWN"), "verdict-unverified");
+  assert.equal(verdictTone("TAMPER_REJECTED"), "verdict-rejected");
+  assert.equal(verdictTone("CREATION_RECEIPT_MATCHED"), "verdict-observed");
 });
