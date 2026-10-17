@@ -74,7 +74,7 @@ test("new studio and demo modules are only served locally with read-only CSP",as
     const page=await root.text();
     for(const phrase of [
       "Verification workspace","LOCAL SIMULATION","PaymentUnknown",
-      "Evidence lab","SDK v0.2 alpha","mode-demo","mode-live",
+      "Evidence lab","Hackathon prototype","mode-demo","mode-live",
       "task-description","task-contract","task-rpc","save-summary",
       "payment-transfer","payment-nonce","data-scenario=\"paid\"",
     ])assert.ok(page.includes(phrase),"missing Studio element: "+phrase);
