@@ -7,6 +7,7 @@ import { paymentMiddleware } from "@x402/express";
 import { x402ResourceServer, HTTPFacilitatorClient } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { authorizeHttpRequest, guardConfig } from "./lib/challenge-guard.mjs";
 
@@ -31,6 +32,8 @@ const guard = guardConfig({
 });
 const resourcePath = guard.resourcePath;
 const receiptsDir = fileURLToPath(new URL("../../receipts/", import.meta.url));
+const prechargeScript = fileURLToPath(new URL("../../tools/charge-attempt-journal.py", import.meta.url));
+const chargeDb = fileURLToPath(new URL("../../receipts/charge-attempts.db", import.meta.url));
 mkdirSync(receiptsDir, { recursive: true, mode: 0o700 });
 
 const support = await fetch(new URL("/supported", facilitatorUrl), {
@@ -81,6 +84,27 @@ server.onAfterSettle(async ({ result, paymentPayload }) => {
     verified: false,
     note: "Untrusted until RPC verification and independent task/quote authorization check. Precharge reservation is not a completed payment.",
   };
+  // Persist the transaction pointer to the *same* durable pre-charge DB.
+  // It remains unverified until the separate RPC + signature reconciler runs.
+  // Losing this callback (or its write) still means PaymentUnknown / NO RECHARGE.
+  if (/^0x[0-9a-f]{64}$/.test(pending.paymentNonce || "")) {
+    const job = spawnSync("python3", [prechargeScript, "attach-hint"], {
+      input: JSON.stringify({
+        schemaVersion: "agentledger.tx-hint.v1",
+        ledger: guard.ledger, taskId: guard.taskId,
+        payer: pending.payer, paymentNonce: pending.paymentNonce,
+        transaction,
+      }),
+      encoding: "utf8", maxBuffer: 65536, timeout: 15000,
+      env: { ...process.env, AGENTLEDGER_CHARGE_DB:
+        process.env.AGENTLEDGER_CHARGE_DB || chargeDb },
+    });
+    if (job.error || job.status !== 0) {
+      console.error("SETTLED BUT TX HINT NOT DURABLE; manual reconciliation required:", transaction);
+    }
+  } else {
+    console.error("SETTLED WITHOUT EIP-3009 NONCE; manual reconciliation required:", transaction);
+  }
   try {
     writeFileSync(`${receiptsDir}/${transaction}.json`, JSON.stringify(pending, null, 2) + "\n",
       { flag: "wx", mode: 0o600 });
