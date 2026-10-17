@@ -13,6 +13,8 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const HASH = /^0x[0-9a-fA-F]{64}$/;
 const serialize = value => JSON.stringify(value, (_key, item) => typeof item === 'bigint' ? item.toString() : item, 2);
 const fields = ['contract', 'payee', 'amount', 'description'];
+const STEP_DISPLAY = { ...STEP_LABELS, recordPayment: '记录付款声明',
+  evidence: '生成付款证据', verify: '核对转账、证据与任务' };
 const same = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase();
 let account = null, busy = false, session = 0, active = null, artifact = null, blocked = false;
 const stepStates = new Map();
@@ -27,7 +29,7 @@ function draftIssue() {
   if (active?.state === 'COMPLETE') return '上次流程已完成。可下载记录，或保留原记录后新建实验。';
   const contract = active?.contract || $('contract').value.trim();
   const to = active?.to || $('payee').value.trim();
-  if (!ADDRESS.test(contract)) return '请填写有效的 Ledger 合约地址。';
+  if (!ADDRESS.test(contract)) return '请填写有效的账本合约地址。';
   if (!ADDRESS.test(to) || /^0x0{40}$/i.test(to) || same(to, account)) return '请填写不同于账户 A 的有效收款地址。';
   try {
     const amount = active ? BigInt(active.valueAtomic) : parseMon($('amount').value.trim());
@@ -35,7 +37,7 @@ function draftIssue() {
   } catch { return 'MON 金额最多支持 18 位小数。'; }
   const description = active?.description ?? $('description').value;
   if (!description.trim() || new TextEncoder().encode(description).length > 100000) return '请填写 1–100000 字节的任务说明。';
-  if (!$('consent').checked) return '核对收款信息后，勾选交易确认选项。';
+  if (!$('consent').checked) return '请先核对转账摘要，再勾选确认选项。';
   return '';
 }
 function renderPreview() {
@@ -46,7 +48,7 @@ function renderPreview() {
   const evidence = active?.result || active?.evidence;
   $('evidence-digest').textContent = evidence?.evidenceHash || evidence?.hash || '—';
   $('transfer-digest').textContent = evidence?.transferHash || '—';
-  $('evidence-source').textContent = evidence ? '本地已保存' : '尚未生成';
+  $('evidence-source').textContent = evidence ? '已保存在此浏览器' : '尚未生成';
   $('evidence-empty').hidden = Boolean(evidence);
 }
 function seedSteps() {
@@ -75,7 +77,7 @@ function render() {
   $('action-hint').textContent = busy ? '请处理 MetaMask 中的原请求，不要重复点击。' : issue || '准备就绪。开始后会逐笔请求钱包确认。';
   $('consent').disabled = busy || blocked || active?.state === 'COMPLETE';
   $('download').disabled = !active;
-  $('new-run').textContent = active?.state === 'COMPLETE' ? '新建实验 · 保留原记录' : '编辑未提交参数 · 保留原记录';
+  $('new-run').textContent = active?.state === 'COMPLETE' ? '新建实验 · 保留记录' : '修改未提交参数 · 保留记录';
   $('steps').setAttribute('aria-busy', String(busy));
   renderPreview();
   $('recover').disabled = busy || blocked || !account || !active;
@@ -152,7 +154,7 @@ function updateStep(record) {
     item = document.createElement('li'); item.dataset.step = record.id;
     const marker = document.createElement('span'); marker.className = 'step-marker'; marker.setAttribute('aria-hidden', 'true');
     const head = document.createElement('div'); head.className = 'step-heading';
-    const title = document.createElement('span'); title.textContent = STEP_LABELS[record.id];
+    const title = document.createElement('span'); title.textContent = STEP_DISPLAY[record.id];
     const state = document.createElement('span'); state.className = 'step-state';
     const detail = document.createElement('p'); detail.className = 'step-detail'; detail.dataset.i18nRaw = '';
     head.append(title, state); item.append(marker, head, detail); $('steps').append(item);
@@ -166,7 +168,7 @@ function updateStep(record) {
   if (record.status === 'running') item.setAttribute('aria-current', 'step'); else item.removeAttribute('aria-current');
   stepStates.set(record.id, record.status);
   const completed = [...stepStates.values()].filter(state => state === 'ok').length;
-  $('progress-count').textContent = completed ? `${completed} / ${ids.length}` : '等待开始';
+  $('progress-count').textContent = completed ? `${completed} / ${ids.length}` : '尚未开始';
 }
 async function start() {
   await exclusive(async () => {

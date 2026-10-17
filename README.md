@@ -1,172 +1,142 @@
-# AgentLedger Hackathon
+# AgentLedger
 
-AgentLedger is an isolated hackathon experiment combining a task ledger, experimental Monad Testnet x402 paid endpoint, and content-addressed evidence CLI.
+中文 | [English](README.en.md)
 
-**Status: hackathon prototype; NOT production-ready.**
+AgentLedger 是基于 Monad 测试网的黑客松原型，用于记录任务、观察支付状态并核验文件证据。项目提供免钱包演示、只读验证工作室、钱包工作台和独立的 MON 支付实验。
 
-## Run locally
+**当前状态：实验原型，尚未达到生产可用标准。MON 集成与最近的页面改动尚未完成运行时验收。**
 
-Prerequisites: Node.js 22 or newer; Python 3 with `pytest` for Python tests.
+## 本地启动
+
+需要 Node.js 22 或更高版本。运行 Python 测试时，另需 Python 3 和 `pytest`。
 
 ```bash
 npm ci --ignore-scripts --no-audit --no-fund
 npm run dev
 ```
 
-- **Studio:** <http://127.0.0.1:4321> — explore local simulations or query a real Monad Testnet task. No wallet is required for read-only queries.
-- **Testnet workspace:** <http://127.0.0.1:4322> — connect the desktop MetaMask extension, deploy AgentLedger, check the deployment, and create a task. Every transaction requires your wallet confirmation and spends test MON for gas. Its same-origin [Studio](http://127.0.0.1:4322/studio) reads chain state without a wallet.
+| 入口 | 地址 | 用途 | 是否需要钱包 |
+| --- | --- | --- | --- |
+| 完整演示 | <http://127.0.0.1:4322/demo> | 约三分钟了解任务、支付声明和证据核验 | 不需要 |
+| 测试网工作台 | <http://127.0.0.1:4322> | 部署账本合约、创建任务、恢复原交易 | 写入时需要 |
+| 验证工作室 | <http://127.0.0.1:4322/studio> | 查询测试网任务、核验本地证据 | 不需要 |
+| MON 支付实验 | <http://127.0.0.1:4322/mon> | 测试币转账、付款记录和证据锚定 | 需要 |
+| 独立验证服务 | <http://127.0.0.1:4321> | 单独使用只读验证工作室 | 不需要 |
 
-Use a browser with MetaMask enabled for signing. For remote development, forwarding **4322** is sufficient for the complete workspace and Studio flow; forward **4321** as well if using the standalone Studio. A phone's `127.0.0.1` does not reach the development computer; mobile QR connection is not implemented.
+页面右上角可切换中英文。语言设置仅影响显示文案，不改写任务输入、签名参数、哈希或导出记录。
 
-You can run the services separately with `npm start` and `npm run deploy:testnet`. `npm run dev` owns only its own processes and stops both on Ctrl+C. It does not terminate existing services using those ports.
+签名操作需要在安装了 MetaMask 扩展的电脑浏览器中完成。远程开发时，转发 **4322** 即可使用完整工作台和同源验证工作室；使用独立验证服务时还需转发 **4321**。手机上的 `127.0.0.1` 指向手机自身，目前未实现手机扫码连接钱包。
 
-## Presenter-ready Pocket + pitch
+`npm run dev` 在前台管理它启动的两个服务，按 Ctrl+C 可停止，不会终止其他已占用端口的进程。也可分别运行 `npm start` 和 `npm run deploy:testnet`。
 
-For a judge presentation, **do not start with the long engineering slides**:
+## 先看免钱包演示
 
-- **Seven-slide pitch:** `slides/judge.md`, built via
-  `cd slides && npm ci --ignore-scripts && npm run build:judge`;
-  the full appendix stays in `slides/slides.md`.
-- **Guided Pocket journey:** click **▶ Start 3-minute guided demo** in
-  `apps/pocket` Web. Its four explicit steps are Created →
-  Recorder Paid claim → Evidence/Verify → Lost ACK, with Back/Next,
-  persistent simulation source label and PaymentUnknown/no-recharge.
-- **Evidence:** on Evidence press Verify SHA-256 locally, optionally
-  load genuine source bytes. Matching a simulated hash is still *not*
-  independent payment acceptance; exporting summary.json retains its
-  source label.
-- **Public-chain evidence:** show the already recorded Monad Testnet
-  Created task via the separate read-only verifier; never blend it
-  with the synthetic Paid/Proven demo.
+打开完整演示，选择开始本地演示。前六步可离线运行，第七步为可选的测试网只读查询。
 
-See [pitch and handoff guide](slides/README.md). Slidev supplies PDF
-and PPTX export scripts; the current public paid Testnet acceptance
-is blocked without an approved reviewed deployment.
-
-## Complete demo (about three minutes)
-
-Open **<http://127.0.0.1:4322/demo>** and click **开始本地演示**. The first six steps are offline and wallet-free; the seventh is a strictly optional read-only Testnet lookup.
-
-| Step | What the audience sees | Source |
+| 步骤 | 展示内容 | 数据来源 |
 | --- | --- | --- |
-| 1. Task | Input SHA-256 bound to a task ID | Local simulation |
-| 2. Payment claim | Recorder says Paid; payment remains PaymentUnknown | Local simulation |
-| 3. Tool result | Deterministic text statistics and downloadable input/output | Actual browser calculation; simulated ledger anchor |
-| 4. Evidence | Exact input/output plus canonical Evidence SHA-256 match | Browser WebCrypto; simulated anchor |
-| 5. Tampering | Changing one output byte is rejected | Actual local verification |
-| 6. Lost ACK | Unknown outcome never becomes an automatic recharge | Local simulation |
-| 7. Optional public task | The pinned creation transaction and current task are queried afresh, if RPC is reachable | Real Monad Testnet read-only RPC; independent from the six-step offline demo |
+| 1. 任务记录 | 将原始输入的 SHA-256 绑定到任务标识 | 本地模拟 |
+| 2. 付款声明 | 展示记录者的付款声明，支付状态仍为 `PaymentUnknown` | 本地模拟 |
+| 3. 工具输出 | 计算文本统计，提供原始输入和输出下载 | 浏览器实际计算；账本锚点为模拟数据 |
+| 4. 证据核验 | 比对规范化证据及输入、输出的 SHA-256 | 浏览器本地计算；链上锚点为模拟数据 |
+| 5. 篡改检测 | 修改一个输出字节后，展示核验失败 | 浏览器本地核验 |
+| 6. 响应丢失 | 展示支付结果未知时的恢复边界，不自动重复付款 | 本地模拟 |
+| 7. 公开任务 | 重新查询公开任务的创建交易和当前状态 | 真实测试网只读查询，依赖网络可用性 |
 
-The final step uses `phase0/demo-showcase.json` as a public identity reference, **not** an approval registry or cached claim of current success. RPC errors and identity mismatches remain visible failures. The **读取真实测试网任务** shortcut jumps to that check; **测试网工作台** opens wallet-assisted deployment and creation.
+公开任务引用来自 `phase0/demo-showcase.json`，仅提供查询身份，不代表部署已获审批或当前查询一定成功。连接失败、任务缺失和身份不匹配都会显示为失败，不会改用模拟数据冒充链上结果。
 
-From the local Proven scenario you can download `evidence.json`, `input.txt`, and `output.json`, then upload them to reproduce the check. **篡改一个输出字节并验证** demonstrates rejection; verifying the original sample again restores the match. `summary.json` separates simulation from real observations and includes read time and verified creation provenance when available. The share link is read-only and carries no wallet authority.
+本地证据场景可下载 `evidence.json`、`input.txt` 和 `output.json`，再选择这些文件重新核验。导出的 `summary.json` 会保留数据来源；重新开始演示只重置本地模拟，不删除钱包交易记录。演示操作见[演示讲解稿](docs/demo-walkthrough.md)。
 
-Use **上一步**, **下一步**, or **重新开始** to present at your own pace. Restarting the walkthrough resets only the local simulation; it never deletes wallet journals or repeats a public transaction. On mobile these controls remain at the bottom of the screen. See the [presenter script](docs/demo-walkthrough.md).
+## 部署并创建测试网任务
 
-## Monad Blitz manual handoff
+1. 在工作台连接 MetaMask，选择 Monad 测试网，链 ID 为 **10143**。
+2. 核对记录账户 `paymentRecorder`。它拥有付款声明记录权限，部署后不能更改；切换钱包账户不会修改合约权限。
+3. 领取测试 MON 后刷新余额，检查部署费用，再到钱包确认部署。
+4. 检查原部署交易。工作台会核对交易参数、区块、运行时代码和记录账户；重连后也会核对已有部署。
+5. 填写任务输入和正整数预算上限，检查创建费用，再到钱包确认。此入口的预算使用 USDC 最小单位，`1000` 对应 `0.001 USDC`，仅约束付款声明金额。
+6. 创建后自动读取链上状态，核对原交易、`TaskCreated` 事件和任务参数，成功后进入同源验证工作室。等待回执时只会有限次重查，不会重新发送交易；也可手动检查原交易。
 
-See [MOJO submission readiness and official developer references](docs/monad-blitz-submission.md). Check portable presentation links and local sensitive files using `npm run submit:check`. This command is offline-only: it never pushes a repository, signs a transaction or submits to MOJO. The final competition repository is managed and published manually by the participant.
+刷新页面会恢复部署和任务记录。若钱包未返回交易哈希，请从 MetaMask 活动中找到原哈希，再使用恢复入口核对。已经保存签名请求的参数会锁定，以便恢复；不要因为响应缺失而重复部署或创建任务。请下载并保留原始记录。
 
-## Testnet walkthrough
+该工作台只部署合约和创建任务，不发起 USDC 支付，不调用 `recordPayment`，也不执行智能体。部署不会自动加入已审批部署登记表。详见[工作台与恢复说明](docs/testnet-workspace.md)。
 
-The wallet account chooser, editable sample input and independent local-demo entry
-were informed by the teammate integration's
-[`agentledger-wallet`](https://github.com/linyuze/monadevidence/tree/5742899190d07410740b08d8cfb118955cb9a371/agentledger-wallet)
-(source snapshot `5742899`). The native-MON pipeline now has a separate `/mon` workspace entry; it does not
-change the USDC observation flow. See [MON integration and recovery](docs/mon-payment-integration.md).
-This integration has not been tested in this session.
+## MON 支付实验
 
-The workspace now offers two entry paths:
+此入口是独立的原生 MON 流程，金额按 MON 填写，链上最小单位为 wei；不能按 USDC 金额解释。
 
-- **Observe without a wallet:** click **读取公开示例任务**, or enter an existing Ledger contract and Task ID. Studio performs a fresh read-only lookup; unavailable RPC and missing tasks remain visible errors.
-- **Create with MetaMask:** connect and switch to Monad Testnet, use **刷新测试 MON 余额**, then check deployment fees. The network configuration panel provides a copyable RPC URL and the official faucet. Refresh the balance after claiming test MON; deployment and task creation still require separate wallet confirmation.
+1. 先在工作台部署并核对合约，将付款账户 A 设为记录账户。
+2. 打开 MON 支付实验，连接账户 A，填写你控制的另一普通账户 B、金额和任务说明。页面不预置收款地址。
+3. 核对转账摘要并勾选确认选项。钱包会依次请求四笔交易确认：创建任务、MON 转账、记录付款、锚定证据。
+4. 查看流程进度并下载记录。中断后继续原流程；钱包响应未知时，先恢复原交易哈希。
 
+交易意图、参数和证据保存在当前浏览器中，不上传服务器。原交易记录用于防止重复发送；同源标签页通过浏览器锁互斥。不同浏览器、设备或来源不共享这个锁，请在原浏览器恢复。
 
-1. Open the Testnet workspace and connect MetaMask. The authorized address appears independently of network selection.
-2. Select Monad Testnet (chain ID **10143**). Review `paymentRecorder`, which is immutable after deployment.
-3. Check balance and deployment fees, then confirm the deployment in MetaMask.
-4. Click **检查已提交的部署**. The workspace checks the transaction, canonical block, deployed runtime and `paymentRecorder`.
-5. Prepare a task from exact UTF-8 input text and a positive budget cap. Confirm its creation in MetaMask.
-6. **Step 4 runs automatically:** the local read-only service checks the creation transaction, `TaskCreated` event, canonical block and task parameters, then opens the same-origin Studio with the exact contract and task ID. Pending receipts are rechecked a bounded number of times; they never trigger another transaction. You can also click **检查任务创建交易** to recheck manually without MetaMask.
+MON 证据使用 `agentledger.mon-payment.v1`；工具执行证据使用 `agentledger.evidence.v1`，两种格式不能互换。结果来自钱包连接的节点，不代表独立的 USDC 支付验收或交易终局性保证。历史余额查询不受支持或同一区块存在其他收款活动时，核对可能中断，不会因此重新转账。
 
-Refreshing restores the original deployment and task records. If a wallet response is lost, paste the original transaction hash into the recovery field and check it. Do not repeat a transaction just because a response is missing. Keep the downloaded deployment and task records, which include the original task input.
+代码参考队友项目的固定提交 [`5742899`](https://github.com/linyuze/monadevidence/tree/5742899190d07410740b08d8cfb118955cb9a371/agentledger-mon)。适配范围、恢复方式和未完成的验收见[MON 集成说明](docs/mon-payment-integration.md)。
 
-**Created is a task record, Paid is a recorder claim, and a hash match establishes byte consistency. None establishes independently verified USDC settlement or correct Agent execution.** The workspace does not issue payments, call `recordPayment`, or run Agents. It does not automatically add a deployment to the PR-reviewed registry.
+## 如何理解页面状态
 
-## Phase 0 observation contract
+| 状态或结果 | 表示什么 |
+| --- | --- |
+| `Created` | 合约已记录任务 |
+| `Paid` | 记录者声称付款已发生 |
+| `Proven` | 合约保存了证据摘要 |
+| `PaymentUnknown` | 尚未独立确认支付结果，不等于未付款或付款失败 |
+| SHA-256 一致 | 参与比较的字节与摘要一致，不证明智能体执行正确 |
 
-Public status is a **read-only projection of independent payment and evidence
-facts**, not part of the Solidity storage states: `Created /
-PaymentUnknown / PaymentObserved / PaymentRecorded / EvidenceAnchored /
-Conflict`. `PaymentUnknown` is **not** payment failure and is not proof
-that no charge happened: never automatically re-charge, re-use the
-authorization nonce, or release a reservation. Chain `Paid` alone is
-recorder attestation; `Proven` alone is a digest anchor, not independent
-execution correctness. See [Phase 0 contract](docs/phase0-contract.md)
-and the [threat model](docs/payment-approval.md).
+对外观察状态包括 `Created`、`PaymentUnknown`、`PaymentObserved`、`PaymentRecorded`、`EvidenceAnchored` 和 `Conflict`，与合约存储状态分开。支付结果未知时，不自动重复扣款、复用授权随机数或释放预留。详见[事实与状态约定](docs/phase0-contract.md)和[支付审批威胁模型](docs/payment-approval.md)。
 
-## Pocket app (read-only mobile / Web observation)
+## 移动端伴随应用与演示材料
 
-`apps/pocket/` is a standalone Expo (React Native + Web) companion for
-the user-side journey **Task → payment observation → evidence check**,
-with an offline four-stage demo and a Lost ACK / `PaymentUnknown`
-branch. It re-verifies the exact `agentledger.evidence.v1` canonical
-SHA-256 on-device via `@noble/hashes`, checks local file bytes
-(2 MiB Evidence / 10 MiB input/output, strict UTF-8), queries real
-Testnet tasks only through the loopback verifier's `GET /api/task`
-(explicit origin-scoped CORS, no wallet, no mutations), and exports an
-untrusted `summary.json`. See [apps/pocket/README.md](apps/pocket/README.md)
-and the executed acceptance record
-[pocket-testnet-acceptance.md](docs/pocket-testnet-acceptance.md).
+`apps/pocket` 是独立的 Expo 应用，支持移动端和网页只读观察，提供任务、支付观察、证据核验和响应丢失演示。它在设备上核验规范化 SHA-256 和原始文件，通过本地验证服务的 `GET /api/task` 查询真实任务，不签名、不写链。证据文件上限为 2 MiB，输入和输出各为 10 MiB，文本按严格 UTF-8 处理。
+
+在两个终端中分别启动：
 
 ```bash
-cd examples/verifier && npm install --ignore-scripts --no-audit --no-fund && npm start
-cd apps/pocket && npm install --ignore-scripts --no-audit --no-fund
-npm run typecheck && npm test && npm run web        # http://localhost:8081
-npm run export:web && npm run test:browser          # real-Chromium smoke on the export
-npm run test:browser:live                           # real Testnet task, read-only via the loopback verifier
+# 终端一：在仓库根目录启动验证服务
+npm start
 ```
-
-`test:browser:live` is the real-chain gate: it starts the loopback verifier,
-reconciles the pinned Monad Testnet task server-side, drives the exported
-app (desktop + 390px mobile) through `Observe Task · no gas`, and rejects
-any run whose `summary.json` misrepresents the observation. The verdict is
-`PASS_OBSERVED_CREATED_PAYMENT_UNKNOWN` — read-only observation, never
-payment acceptance. The record is written once in
-`out/pocket-live-testnet/` (`wx` flag); remove that directory to rerun.
-
-## SDK (private preview, not published)
-
-`sdk/` builds the private, typed `@agentledger/verify@0.2.0-alpha.3`
-read-only package: three public operations `observe / verify /
-reconcile(receipt-only)`, stable v1 error codes, strict pre-RPC
-validation, and rejection of injected `client`/`transport` at
-construction. Receipt reconciliation stays `PaymentUnknown` until the
-separate Phase 0 signed-intent/precharge workflow succeeds. See
-[SDK stability contract](sdk/README.md).
-
-## Validation
 
 ```bash
-npm test                 # Node + SDK + Python; failures return nonzero
-npm run onsite:check     # Offline readiness.json preview; no wallet, no signature
-npm run submit:check     # Manual handoff guard: portable slides/UI and no sensitive files
-npm run test:pocket      # Pocket TypeScript + portable SHA-256 unit tests
-npm run test:pocket:typecheck
-npm run test:browser     # Studio simulation in real headless Chromium
-npm run test:browser:live # Optional: dev server running; real public-Testnet read, no signing
+# 终端二：安装并启动伴随应用
+cd apps/pocket
+npm ci --ignore-scripts --no-audit --no-fund
+npm run web
 ```
 
-Pocket additionally has a **real-chain** read-only acceptance:
-`apps/pocket` → `npm run test:browser:live` starts the loopback verifier,
-observes the recorded Testnet task through the app, and archives
-`out/pocket-live-testnet/` evidence; see the
-[acceptance record](docs/pocket-testnet-acceptance.md).
+网页地址通常为 <http://localhost:8081>。详见[伴随应用说明](apps/pocket/README.md)和[历史只读验收记录](docs/pocket-testnet-acceptance.md)；历史记录不代表当前版本已通过验收。
 
-Every gate above is enforced by GitHub Actions: [.github/workflows/ci.yml](.github/workflows/ci.yml)
-adds the hermetic Anvil acceptance (loopback, simulated recorder payment) and the
-Pocket Expo-Web export/build/smoke chain that cannot run as part of `npm test`.
+评委展示优先使用七页讲稿：[中文版](slides/judge.md)与[英文版](slides/judge.en.md)。完整技术附录为 `slides/slides.md`。
 
-Browser checks require system Chrome/Chromium; set `AGENTLEDGER_CHROME_PATH` if needed. The optional [local EVM browser test](docs/testnet-workspace.md#local-evm-browser-test) additionally deploys real Solidity bytecode and creates a real task on **local Anvil**, without claiming a public Testnet payment.
+```bash
+cd slides
+npm ci --ignore-scripts --no-audit --no-fund
+npm run build:judge
+npm run build:judge:en
+```
 
-See [Testnet workspace and recovery](docs/testnet-workspace.md), [Phase 0 fact semantics](docs/phase0-contract.md), and [public Testnet acceptance requirements](docs/live-testnet-observation.md).
+导出与展示方式见[演示材料说明](slides/README.md)。赛事报名与提交由参赛者手动完成，详见[提交准备说明](docs/monad-blitz-submission.md)。
+
+## 只读开发工具包
+
+`sdk` 提供尚未发布的 `@agentledger/verify@0.2.0-alpha.3`，包含 `observe`、`verify` 和仅核对回执的 `reconcile`。回执核对本身不能将支付状态升级为已验证；接口、错误码和约束见[工具包说明](sdk/README.md)。
+
+## 验证命令与当前边界
+
+以下为可用命令，不表示本次已执行或通过。本轮仅调整文案与文档，未运行应用测试、浏览器验收或链上交易；MON 集成仍待单独验收。
+
+| 命令 | 范围 |
+| --- | --- |
+| `npm test` | Node.js、工具包与 Python 测试 |
+| `npm run onsite:check` | 离线演示准备检查 |
+| `npm run submit:check` | 离线检查展示链接与敏感文件，不上传或提交项目 |
+| `npm run test:pocket` | 伴随应用单元测试 |
+| `npm run test:pocket:typecheck` | 伴随应用类型检查 |
+| `npm run test:browser` | 本地模拟的浏览器检查 |
+| `npm run test:browser:anvil` | 本地 Anvil 合约与浏览器检查 |
+| `npm run test:browser:live` | 真实测试网只读查询，需要本地服务运行 |
+
+浏览器检查需要 Chrome 或 Chromium，可通过 `AGENTLEDGER_CHROME_PATH` 指定路径；Anvil 检查另需 Foundry。伴随应用还有独立的 `test:browser:live` 命令，会将只读观察记录写入 `out/pocket-live-testnet/`；该目录采用只写一次的方式，重跑前应先保留历史证据，再处理原输出目录。
+
+持续集成配置见[工作流](.github/workflows/ci.yml)，实际执行情况以对应提交的运行结果为准。公开测试网支付的正式验收要求见[验收说明](docs/live-testnet-observation.md)。

@@ -118,13 +118,13 @@
                 <div class="fact-item"><div class="fact-head"><span>Payment observation</span><span class="fact-source">RECEIPT NOT VERIFIED</span></div><strong id="payment-fact" class="text-warn">PaymentUnknown</strong><small id="payment-detail">No independent Transfer + AuthorizationUsed + quote proof</small><div class="fact-metadata"><span>Transfer</span><code id="payment-transfer">NOT VERIFIED</code><span>AuthorizationUsed / Nonce</span><code id="payment-nonce">NOT VERIFIED</code></div></div>
                 <div class="fact-item"><div class="fact-head"><span>Evidence fact</span><span class="fact-source">SHA-256</span></div><strong id="evidence-fact">Not anchored</strong><small id="evidence-detail">Check original bytes to establish digest equality</small></div>
               </div>
-              <div class="readonly-warning"><span>ⓘ</span><p><strong>No recharge.</strong> Unknown payment does not mean unpaid. ACP exclusively owns Agent execution and recovery.</p></div>
+              <div class="readonly-warning"><span>ⓘ</span><p><strong>No recharge.</strong> Check the original payment before retrying. Agent execution and recovery are handled separately.</p></div>
             </section>
           </div>
         </section>
 
         <section id="evidence-panel" class="evidence-section" aria-labelledby="evidence-title">
-          <div class="section-head"><div><span class="overline">EVIDENCE LAB</span><h2 id="evidence-title">Prove a digest. Not a narrative.</h2></div><p class="section-sub">Canonical JSON and raw input/output SHA-256 are checked locally in the browser. Files never leave this device.</p></div>
+          <div class="section-head"><div><span class="overline">EVIDENCE LAB</span><h2 id="evidence-title">Verify the original files.</h2></div><p class="section-sub">Canonical JSON and raw input/output SHA-256 are checked locally in the browser. Files never leave this device.</p></div>
           <div class="evidence-grid">
             <section class="panel"><span class="overline">LOCAL CHECK</span><h3>Evidence verification</h3><p class="help-text">For the local Proven scenario, run a generated fixture check. For real tasks, select your own files.</p>
               <div class="evidence-action"><button id="run-sample-proof" type="button" class="button secondary full" disabled>Verify simulated Evidence <span>✓</span></button></div>
@@ -151,7 +151,7 @@
               </div>
               <div class="artifact-tools"><button type="button" id="save-summary" class="button secondary full">Export summary.json <span>↓</span></button><p class="field-help">Reports the current observation only. Simulated data cannot become a Testnet acceptance claim.</p></div>
               <div id="live-share" hidden lang="zh-CN"><label for="share-url">当前真实任务的只读链接</label><input id="share-url" type="text" readonly><a id="creation-transaction" class="button secondary full" target="_blank" rel="noopener noreferrer" hidden>查看真实创建交易</a><p id="observed-at" class="field-help"></p></div>
-              <p class="data-footnote">A hash match proves byte consistency, not payment authorization, model correctness or independent ACP operation ownership.</p>
+              <p class="data-footnote">A matching hash establishes byte consistency. Payment authorization and Agent execution require separate verification.</p>
             </section>
           </div>
         </section>

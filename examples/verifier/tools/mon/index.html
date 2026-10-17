@@ -3,27 +3,27 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f3f6fb"><title>AgentLedger · MON 支付实验</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/deploy.css"><link rel="stylesheet" href="/experience.css"><script type="module" src="/mon/app.mjs"></script></head>
 <body class="mon-page"><a class="skip-link" href="#payment-form">跳到操作区</a><main class="deploy-workspace">
 <header class="deploy-header"><a class="workspace-brand" href="/demo">AgentLedger</a><nav aria-label="工作区导航"><a href="/demo">演示与验证</a><a href="/">测试网工作台</a><a href="/mon" aria-current="page">MON 支付实验</a></nav><div class="header-tools"><span class="network-tag">Monad Testnet · 10143</span><button id="language-switch" class="language-switch" type="button" aria-label="Switch to English">English</button></div></header>
-<section class="page-intro"><div><h1>让一笔转账留下可核对的证据。</h1><p>从两个账户间的测试 MON 转账，到付款记录与证据锚定。逐步确认，随时查看原交易。</p></div><a href="/" class="text-link">还没有合约？先去部署</a></section>
+<section class="page-intro"><div><h1>为测试网转账生成可核验的证据。</h1><p>连接付款账户，填写收款信息，逐笔确认交易并保存证据。</p></div><a href="/" class="text-link">先部署并核对账本合约</a></section>
 <div class="scope-note"><strong>原生 MON 实验</strong><span>每笔交易由你确认。此流程独立于 USDC / x402；中断后恢复原交易，不会自动重付。</span></div>
 <div class="payment-layout">
 <div id="payment-form" class="payment-editor">
-<section class="panel form-section" aria-labelledby="wallet-title"><div class="form-section-head"><span class="section-number">1</span><div><h2 id="wallet-title">连接付款账户</h2><p>使用部署时的记录账户，准备测试 MON 和 gas。</p></div></div>
+<section class="panel form-section" aria-labelledby="wallet-title"><div class="form-section-head"><span class="section-number">1</span><div><h2 id="wallet-title">连接付款账户</h2><p>使用合约的记录账户付款，并预留足够的测试 MON 支付网络手续费。</p></div></div>
 <div class="wallet-actions"><button class="button primary" id="connect">连接 MetaMask</button><button class="button secondary" id="select-account">选择账户</button><button class="button secondary" id="network">切换测试网</button></div>
 <p id="account" class="account-line" role="status">尚未连接。</p>
-<p class="field-help">账户 A 必须是合约的 paymentRecorder。<a href="https://faucet.monad.xyz" target="_blank" rel="noopener noreferrer">领取测试 MON</a></p>
+<p class="field-help">付款账户 A 须与合约的记录账户（paymentRecorder）一致。<a href="https://faucet.monad.xyz" target="_blank" rel="noopener noreferrer">领取测试 MON</a></p>
 </section>
-<section class="panel form-section" aria-labelledby="transfer-title"><div class="form-section-head"><span class="section-number">2</span><div><h2 id="transfer-title">填写转账信息</h2><p>收款账户和金额会在开始后锁定，用于核对原交易。</p></div></div>
-<label for="contract">Ledger 合约地址</label><input id="contract" type="text" placeholder="0x…" spellcheck="false" autocomplete="off" aria-describedby="contract-help"><p id="contract-help" class="field-help">可从工作台带入，开始前会再次核对合约代码与记录账户。</p>
-<label for="payee">收款账户 B</label><input id="payee" type="text" placeholder="填写你控制的另一钱包地址" spellcheck="false" autocomplete="off" aria-describedby="payee-help"><p id="payee-help" class="field-help">请使用不同于付款账户的普通账户，此实验不支持合约收款地址。</p>
-<label for="amount">转账金额（MON）</label><div class="amount-field"><input id="amount" type="text" inputmode="decimal" value="0.001" autocomplete="off" aria-describedby="amount-help"><span aria-hidden="true">MON</span></div><p id="amount-help" class="field-help">另需四笔交易的 gas；每笔费用以 MetaMask 确认为准。</p>
+<section class="panel form-section" aria-labelledby="transfer-title"><div class="form-section-head"><span class="section-number">2</span><div><h2 id="transfer-title">填写转账信息</h2><p>开始后会保存并锁定本次参数，供中断恢复时核对原交易。</p></div></div>
+<label for="contract">账本合约地址</label><input id="contract" type="text" placeholder="0x…" spellcheck="false" autocomplete="off" aria-describedby="contract-help"><p id="contract-help" class="field-help">可带入工作台中保存的地址。开始前会重新核对合约代码与记录权限。</p>
+<label for="payee">收款账户 B</label><input id="payee" type="text" placeholder="填写你控制的另一钱包地址" spellcheck="false" autocomplete="off" aria-describedby="payee-help"><p id="payee-help" class="field-help">请填写你控制的另一普通钱包地址。本实验仅支持普通账户收款。</p>
+<label for="amount">转账金额（MON）</label><div class="amount-field"><input id="amount" type="text" inputmode="decimal" value="0.001" autocomplete="off" aria-describedby="amount-help"><span aria-hidden="true">MON</span></div><p id="amount-help" class="field-help">请另预留四笔交易的网络手续费，具体费用以钱包确认页为准。</p>
 <label for="description">任务说明</label><textarea id="description" rows="3">Monad Testnet native MON payment experiment.</textarea>
 </section>
-<section class="panel form-section confirmation-section" aria-labelledby="confirm-title"><div class="form-section-head"><span class="section-number">3</span><div><h2 id="confirm-title">核对并开始</h2><p>四次钱包确认：创建任务、转账、记录付款、锚定证据。</p></div></div>
+<section class="panel form-section confirmation-section" aria-labelledby="confirm-title"><div class="form-section-head"><span class="section-number">3</span><div><h2 id="confirm-title">核对并开始</h2><p>依次确认四笔交易：创建任务、MON 转账、记录付款、锚定证据。</p></div></div>
 <label class="consent-label"><input id="consent" type="checkbox"><span>我已核对收款地址和金额，同意依次请求四笔交易的钱包确认。</span></label>
 <button class="button primary full" id="run" disabled>开始实验</button><p id="action-hint" class="field-help">请先连接钱包。</p>
 <div class="status-box"><span class="status-label">当前进度</span><p id="status" class="response" role="status" aria-live="polite">尚未发送交易。</p></div>
 <button class="button secondary full" id="new-run" disabled>编辑未提交参数 / 新建实验（保留原记录）</button>
-<details class="recovery-panel"><summary>交易中断或钱包没有返回哈希？</summary><p class="field-help">先在 MetaMask 活动中找到原交易。核对原哈希后再继续，无需重新转账。</p>
+<details class="recovery-panel"><summary>流程中断？恢复原交易</summary><p class="field-help">在 MetaMask 活动中找到原交易哈希，粘贴到下方核对。核对成功后继续原流程，不重新付款。</p>
 <label for="recovery-stage">中断步骤</label><select id="recovery-stage"><option value="createTask">创建任务</option><option value="transfer">MON 转账</option><option value="recordPayment">付款记录</option><option value="submitEvidence">证据锚定</option></select>
 <label for="recovery-hash">原交易哈希</label><input id="recovery-hash" type="text" placeholder="0x…" spellcheck="false"><button class="button secondary" id="recover">核对原交易 · 不重发</button></details>
 </section>
@@ -32,14 +32,14 @@
 <section class="transfer-sheet" aria-labelledby="preview-title"><div class="sheet-head"><h2 id="preview-title">本次转账</h2><span id="run-source" class="source-chip">待确认</span></div>
 <p class="transfer-amount"><span id="preview-amount" data-i18n-raw>0.001</span> <span>MON</span></p>
 <dl class="transfer-parties"><div><dt>付款账户 A</dt><dd id="preview-from" data-i18n-raw>—</dd></div><div><dt>收款账户 B</dt><dd id="preview-to" data-i18n-raw>—</dd></div></dl>
-<p class="sheet-foot">这里只展示待确认参数；链上结果以本次读取为准。</p></section>
-<section class="panel progress-panel"><div class="sheet-head"><h2>流程进度</h2><span id="progress-count">等待开始</span></div><ol id="steps" class="payment-timeline" aria-label="流程步骤"></ol></section>
+<p class="sheet-foot">这里只展示转账参数，尚不代表交易已提交。链上结果以实际查询为准。</p></section>
+<section class="panel progress-panel"><div class="sheet-head"><h2>流程进度</h2><span id="progress-count">尚未开始</span></div><ol id="steps" class="payment-timeline" aria-label="流程步骤"></ol></section>
 <section class="panel evidence-panel"><div class="sheet-head"><h2>证据与记录</h2><span id="evidence-source" class="source-chip">尚未生成</span></div>
-<p id="evidence-empty" class="empty-note">转账确认后生成付款证据。流程中断时，也可下载当前记录。</p>
+<p id="evidence-empty" class="empty-note">核对转账后生成付款证据。即使流程中断，也可先下载已有记录。</p>
 <dl class="evidence-summary"><div><dt>证据 SHA-256</dt><dd id="evidence-digest" data-i18n-raw>—</dd></div><div><dt>转账交易</dt><dd id="transfer-digest" data-i18n-raw>—</dd></div></dl>
-<button class="button secondary full" id="download" disabled>下载当前记录与证据</button>
-<details class="raw-record"><summary>查看 Task ID 与原始 JSON</summary><label for="task-id">Task ID</label><input id="task-id" type="text" readonly data-i18n-raw placeholder="开始后生成"><pre id="result" class="response" data-i18n-raw>{}</pre></details>
-<p class="field-help">记录保存在此浏览器。请保留浏览器数据并下载备份。</p>
+<button class="button secondary full" id="download" disabled>下载记录与证据</button>
+<details class="raw-record"><summary>查看任务标识与原始数据</summary><label for="task-id">任务标识</label><input id="task-id" type="text" readonly placeholder="开始后生成"><pre id="result" class="response" data-i18n-raw>{}</pre></details>
+<p class="field-help">记录仅保存在当前浏览器。请下载备份，恢复完成前不要清除网站数据。</p>
 </section>
 <details class="scope-details"><summary>这份证据说明什么？</summary><p>付款证据使用 agentledger.mon-payment.v1，核对 MON 转账与链上锚点；不代表 USDC 支付验收、Agent 执行正确或交易终局性。</p></details>
 </aside>
