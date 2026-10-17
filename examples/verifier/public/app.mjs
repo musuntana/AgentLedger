@@ -2,9 +2,9 @@
 import { verifyEvidence } from './evidence-browser.mjs';
 import { buildDemoCase } from './demo-scenarios.mjs';
 import { makeSummary, RPC_LABEL } from './summary.mjs';
-import { verificationMatrix, observationMetrics } from './verdict-matrix.mjs';
+import { verificationMatrix, observationMetrics, verdictStateLabel, verdictTone } from './verdict-matrix.mjs';
 import { DEMO_STEPS, validShowcase } from './demo-guide.mjs';
-import { initLanguage } from './locale.mjs';
+import { initLanguage, language, localize } from './locale.mjs';
 
 const byId = id => document.getElementById(id);
 const HEX40 = /^0x[0-9a-fA-F]{40}$/;
@@ -44,10 +44,12 @@ function renderVerdicts() {
     const tr = document.createElement('tr');
     for (const field of ['claim','checkedBy','state']) {
       const td = document.createElement('td');
-      td.textContent = row[field];
-      if (field === 'state') td.className =
-        row.state === 'PAYMENT_UNKNOWN' || row.state === 'NOT_VERIFIED' || row.state === 'NOT_RUN'
-          ? 'verdict-unverified' : row.state === 'TAMPER_REJECTED' ? 'verdict-rejected' : 'verdict-observed';
+      td.textContent = field === 'state'
+        ? verdictStateLabel(row.state, language()) : localize(row[field]);
+      if (field === 'state') {
+        td.dataset.state = row.state; // Preserve the unlocalized machine state.
+        td.className = verdictTone(row.state);
+      }
       tr.append(td);
     }
     return tr;
@@ -65,6 +67,7 @@ function renderVerdicts() {
       : 'LOCAL SIMULATION ONLY · no public payment accepted')
     : 'TASK OBSERVED ONLY · payment and finality remain unverified');
 }
+document.addEventListener('agentledger:language', renderVerdicts);
 function displayTask(task, kind = 'SIMULATION') {
   loadedTask = task; evidenceVerification = 'NOT_RUN'; verificationSequence++;
   const live = kind === 'TESTNET';
