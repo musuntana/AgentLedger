@@ -145,6 +145,14 @@
                 <div><dt>Write gas</dt><dd id="metric-write-gas">NOT ATTRIBUTABLE</dd></div>
               </dl>
               <p class="limits-foot">Lost ACK → PaymentUnknown → NO RECHARGE. Null metrics are honest unknowns, not zero values.</p>
+              <div class="recovery-strip" role="note" aria-label="Lost acknowledgment recovery">
+                <h4>Lost response: safe recovery</h4>
+                <ol>
+                  <li><strong>Preserve the original intent</strong><span>Retain the task, payment nonce, and original transaction hash if available.</span></li>
+                  <li><strong>Recheck without spending</strong><span>Read the original transaction and matching chain events; do not send another payment.</span></li>
+                  <li><strong>Hold an uncertain outcome</strong><span>Missing evidence means PaymentUnknown, not failed payment or permission to retry.</span></li>
+                </ol>
+              </div>
             </section>
           </div>
         </section>
