@@ -43,3 +43,12 @@
 .metric-grid dt{color:#667993}.metric-grid dd{margin:0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;font-weight:650;color:#28425f}.limits-foot{font-size:12px;line-height:1.65;color:#765d3b;margin:16px 0 0}
 @media(max-width:960px){.results-grid{grid-template-columns:1fr}.honest-results .director-source{text-align:left}}
 @media(max-width:650px){.start-here{display:block}.results-grid>.panel{padding:16px}.metric-grid>div{grid-template-columns:1fr;gap:1px}}
+
+/* Read-only lost-ACK recovery guidance: visual steps, not interactive payment actions. */
+.recovery-strip{margin-top:18px;border-top:1px solid #e7edf5;padding-top:15px}
+.recovery-strip h4{font-size:12px;font-weight:700;letter-spacing:.01em;color:#28425f;margin:0 0 11px}
+.recovery-strip ol{margin:0;padding:0;list-style:none;display:grid;gap:10px;counter-reset:recovery}
+.recovery-strip li{counter-increment:recovery;display:grid;grid-template-columns:22px minmax(0,1fr);column-gap:9px;align-items:start}
+.recovery-strip li:before{content:counter(recovery);display:grid;place-items:center;width:21px;height:21px;border-radius:50%;background:#eef2fb;color:#506387;font-size:11px;font-weight:700;grid-row:span 2}
+.recovery-strip strong{font-size:12px;font-weight:700;color:#354967;line-height:1.55}
+.recovery-strip span{font-size:12px;color:#667993;line-height:1.5}
