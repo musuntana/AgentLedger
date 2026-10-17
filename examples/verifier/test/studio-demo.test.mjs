@@ -74,7 +74,7 @@ test("new studio and demo modules are only served locally with read-only CSP",as
     const page=await root.text();
     for(const phrase of [
       "Verification workspace","LOCAL SIMULATION","PaymentUnknown",
-      "Evidence lab","SDK v0.2 alpha","mode-demo","mode-live",
+      "Evidence lab","HONEST RESULTS","mode-demo","mode-live",
       "task-description","task-contract","task-rpc","save-summary",
       "payment-transfer","payment-nonce","data-scenario=\"paid\"",
        "verification-matrix-body","honest-outcome","metric-read-latency","metric-creation-block",
