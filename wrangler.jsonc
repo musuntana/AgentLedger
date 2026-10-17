@@ -14,5 +14,10 @@
   },
   "vars": {
     "MONAD_RPC_URL": "https://testnet-rpc.monad.xyz"
+  },
+  "previews": {
+    "vars": {
+      "MONAD_RPC_URL": "https://testnet-rpc.monad.xyz"
+    }
   }
 }
