@@ -24,7 +24,8 @@ export function observationMetrics({ simulation = true, readPathLatencyMs = null
   };
 }
 export function verificationMatrix({
-  simulation = true, task = null, verification = "NOT_RUN", creation = null
+  simulation = true, task = null, verification = "NOT_RUN", creation = null,
+  inputChecked = false, outputChecked = false
 } = {}) {
   const present = Boolean(task);
   const confirmed = !simulation && checkedCreation(creation);
@@ -38,6 +39,10 @@ export function verificationMatrix({
       state: !present ? "NOT_RUN" : verification === "HASH_MATCHED"
         ? (simulation ? "LOCAL_HASH_MATCH" : "HASH_MATCH_NOT_EXECUTION")
         : verification === "TAMPER_REJECTED" ? "TAMPER_REJECTED" : "NOT_VERIFIED" },
+    { id: "source-files", claim: "Original input/output", checkedBy: "SHA-256 vs Evidence file digests",
+      state: !present || verification !== "HASH_MATCHED" ? "NOT_VERIFIED"
+        : inputChecked && outputChecked ? "SOURCE_BYTES_MATCHED"
+        : inputChecked || outputChecked ? "SOURCE_BYTES_PARTIAL" : "SOURCE_BYTES_NOT_SUPPLIED" },
     { id: "finality", claim: "Chain finality", checkedBy: "Independent finality verification",
       state: "NOT_VERIFIED" },
     { id: "execution", claim: "Execution correctness", checkedBy: "Independent execution evidence",
@@ -58,11 +63,15 @@ const VERDICT_LABELS = Object.freeze({
   LOCAL_HASH_MATCH: ['Local bytes matched', '本地字节匹配'],
   HASH_MATCH_NOT_EXECUTION: ['Digest matched · not execution proof', '摘要匹配 · 不代表执行正确'],
   TAMPER_REJECTED: ['Tampered bytes rejected', '已拒绝被篡改的字节'],
+  SOURCE_BYTES_MATCHED: ['Both original files matched', '输入与输出原始文件均匹配'],
+  SOURCE_BYTES_PARTIAL: ['Only one original file checked', '仅核验了一份原始文件'],
+  SOURCE_BYTES_NOT_SUPPLIED: ['Original files not supplied', '未提供原始输入与输出'],
 });
 const OBSERVED_STATES = new Set([
-  'CREATION_RECEIPT_MATCHED','LOCAL_HASH_MATCH','HASH_MATCH_NOT_EXECUTION',
+  'CREATION_RECEIPT_MATCHED','LOCAL_HASH_MATCH','HASH_MATCH_NOT_EXECUTION','SOURCE_BYTES_MATCHED',
 ]);
-const LIMITED_STATES = new Set(['SIMULATED_ONLY','TASK_STATE_OBSERVED']);
+const LIMITED_STATES = new Set(['SIMULATED_ONLY','TASK_STATE_OBSERVED',
+  'SOURCE_BYTES_PARTIAL','SOURCE_BYTES_NOT_SUPPLIED']);
 export function verdictStateLabel(state, lang = 'en') {
   const pair = VERDICT_LABELS[state];
   return pair ? pair[lang === 'zh' ? 1 : 0] : lang === 'zh' ? '未知状态 · 未验证' : 'Unknown state · not verified';
