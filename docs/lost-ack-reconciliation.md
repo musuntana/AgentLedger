@@ -109,3 +109,11 @@ They neither contact Monad nor use wallet funds.
 **Truthful acceptance:** The hermetic tests do not demonstrate a full paid
 Monad Testnet x402 → Recorder → Evidence sequence. A reviewed deployment,
 real-wallet acceptance and explicit finality policy remain separate gates.
+
+### Recovery CLI diagnostic privacy
+
+`reconcile-hint.mjs` reads the local approval JSON with a 2 MiB file bound.
+Failure exits nonzero with a generic `UNKNOWN_NO_RECHARGE` line; it does
+not echo the original signed approval, private filesystem paths, or raw
+provider error messages. Recover the exact original attempt locally and
+never interpret this error as confirmation that the payment failed.
