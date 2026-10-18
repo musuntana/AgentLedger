@@ -23,6 +23,7 @@ for (const link of document.querySelectorAll('[data-workspace-target]')) {
 }
 let currentMode = 'demo', currentDemo = null, loadedTask = null;
 let lookupSequence = 0, verificationSequence = 0, evidenceVerification = 'NOT_RUN';
+let evidenceSourceChecks = { inputChecked: false, outputChecked: false };
 let liveAbort = null, observedAt = null, creationObservation = null, liveReadPathLatencyMs = null;
 let guideIndex = -1, guideBusy = false, guideGeneration = 0;
 function text(id, value) { byId(id).textContent = String(value ?? '—'); }
@@ -38,7 +39,8 @@ function proofButtons(busy = false) {
 function renderVerdicts() {
   const simulation = currentMode === 'demo';
   text('verdict-source', simulation ? 'LOCAL / SIMULATED ONLY' : loadedTask ? 'TESTNET / READ ONLY' : 'TESTNET / NOT QUERIED');
-  const rows = verificationMatrix({simulation, task:loadedTask, verification:evidenceVerification, creation:creationObservation});
+  const rows = verificationMatrix({simulation, task:loadedTask, verification:evidenceVerification,
+    creation:creationObservation, ...evidenceSourceChecks});
   const tbody = byId('verification-matrix-body');
   tbody.replaceChildren(...rows.map(row => {
     const tr = document.createElement('tr');
@@ -69,7 +71,8 @@ function renderVerdicts() {
 }
 document.addEventListener('agentledger:language', renderVerdicts);
 function displayTask(task, kind = 'SIMULATION') {
-  loadedTask = task; evidenceVerification = 'NOT_RUN'; verificationSequence++;
+  loadedTask = task; evidenceVerification = 'NOT_RUN';
+  evidenceSourceChecks = { inputChecked: false, outputChecked: false }; verificationSequence++;
   const live = kind === 'TESTNET';
   text('task-network', live ? 'Monad Testnet · 10143' : 'Local simulation · NOT CHAIN');
   for (const [id, field] of Object.entries({ 'task-value': 'taskId', 'task-description': 'descriptionHash', 'task-contract': 'contract', 'task-creator': 'creator', 'task-payer': 'payer', 'task-amount': 'amountAtomic', 'task-budget': 'maxBudgetAtomic', 'task-settlement': 'settlementRef', 'task-hash': 'evidenceHash' })) text(id, task[field]);
@@ -99,7 +102,8 @@ function displayTask(task, kind = 'SIMULATION') {
 }
 function clearTask() {
   loadedTask = null; currentDemo = null; observedAt = null; creationObservation = null; liveReadPathLatencyMs = null;
-  evidenceVerification = 'NOT_RUN'; verificationSequence++;
+  evidenceVerification = 'NOT_RUN'; evidenceSourceChecks = { inputChecked: false, outputChecked: false };
+  verificationSequence++;
   proofButtons();
   text('observation-title', 'No task selected'); text('ledger-badge', 'UNKNOWN');
   byId('ledger-badge').className = 'state-pill';
@@ -221,7 +225,9 @@ async function checkEvidence(evidence, input, output, context) {
   if (context.task?.status !== 'Proven') throw Error('No Proven task');
   const result = await verifyEvidence(evidence, context.task, input, output);
   if (!isCurrent(context)) return false;
-  evidenceVerification = 'HASH_MATCHED'; renderVerdicts();
+  evidenceVerification = 'HASH_MATCHED';
+  evidenceSourceChecks = { inputChecked: result.inputChecked, outputChecked: result.outputChecked };
+  renderVerdicts();
   text('evidence-fact', context.mode === 'demo' ? 'SIMULATED · Hash matched' : 'Hash matched to chain anchor');
   text('evidence-detail', context.mode === 'demo' ? 'Local-only simulated anchor, not a Monad transaction.' : 'Canonical Evidence bytes match on-chain hash; payment remains unknown.');
   message('verification-message', (context.mode === 'demo' ? 'SIMULATED MATCH' : 'HASH MATCH') + ': ' + result.digest + '. Original input ' + (result.inputChecked ? 'verified' : 'not supplied') + '; output ' + (result.outputChecked ? 'verified' : 'not supplied') + '. No payment or execution correctness claim.', 'success');
@@ -229,7 +235,8 @@ async function checkEvidence(evidence, input, output, context) {
 }
 function verificationFailure(error, context, tamper = false) {
   if (!isCurrent(context)) return;
-  evidenceVerification = tamper ? 'TAMPER_REJECTED' : 'NOT_VERIFIED'; renderVerdicts(); text('evidence-fact', tamper ? 'SIMULATED · Tampered output rejected' : 'Not verified');
+  evidenceVerification = tamper ? 'TAMPER_REJECTED' : 'NOT_VERIFIED';
+  evidenceSourceChecks = { inputChecked: false, outputChecked: false }; renderVerdicts(); text('evidence-fact', tamper ? 'SIMULATED · Tampered output rejected' : 'Not verified');
   text('evidence-detail', error.message);
   message('verification-message', (tamper ? 'EXPECTED REJECTION: ' : 'NOT VERIFIED: ') + error.message, tamper ? 'success' : 'error');
 }
@@ -237,6 +244,7 @@ async function runSampleProof(tamper = false) {
   if (currentMode !== 'demo' || currentDemo?.task.status !== 'Proven') return false;
   const context = verificationContext(), sample = currentDemo;
   proofButtons(true); evidenceVerification = 'NOT_RUN';
+  evidenceSourceChecks = { inputChecked: false, outputChecked: false }; renderVerdicts();
   message('verification-message', tamper ? 'Changing one output byte before checking…' : 'Hashing local input, output and Evidence…');
   try {
     const output = sample.outputBytes.slice(); if (tamper) output[0] ^= 1;
@@ -256,6 +264,7 @@ async function chosenFile(id, maxBytes) {
 byId('verify-button').addEventListener('click', async () => {
   if (loadedTask?.status !== 'Proven') return;
   cancelGuide(); const context = verificationContext(); proofButtons(true); evidenceVerification = 'NOT_RUN';
+  evidenceSourceChecks = { inputChecked: false, outputChecked: false }; renderVerdicts();
   message('verification-message', 'Computing SHA-256 entirely in this browser …');
   try {
     const bytes = await chosenFile('evidence-file', 2 * 1024 * 1024);
@@ -283,6 +292,7 @@ byId('save-summary').addEventListener('click', () => {
   if (!loadedTask) return;
   const summary = makeSummary(loadedTask, { simulation: currentMode === 'demo', verification: evidenceVerification,
     scenario: currentMode === 'demo' ? currentDemo?.key : null,
+    evidenceChecks: evidenceSourceChecks,
     observation: { observedAt, creation: creationObservation, readPathLatencyMs: liveReadPathLatencyMs } });
   download('summary.json', JSON.stringify(summary, null, 2) + '\n');
 });
