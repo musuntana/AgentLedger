@@ -34,6 +34,8 @@ const observed=await sdk.observe(ledgerContract,taskId);
 // observed.schemaVersion === "agentledger.sdk.read-only.v1"
 // observed.status.state === "PaymentUnknown" (even if recorder says Proven)
 // observed.rpcWitness === "SINGLE_RPC" or "DUAL_RPC_MATCHED"
+// In dual mode: observed.rpcWitnessBlockNumber / rpcWitnessBlockHash
+// identify the common historical block used for BOTH task reads.
 
 const matched=await sdk.verify(ledgerContract,taskId,evidenceJson,{
   inputBytes: originalInputUint8Array,
@@ -73,11 +75,17 @@ read-only observation.
 
 `rpcWitness="DUAL_RPC_MATCHED"` denotes agreement at **two configured
 RPC URLs**, not two independent infrastructure operators. Behind different
-URLs the same node/provider may be used. Neither task observations nor
-receipts are pinned to the same historical block in this alpha, so chain
-progress between reads can cause safe false conflicts. Receipt chain-head
-and confirmation counts are allowed to differ, but the underlying
-transaction, event positions, block hash and nonce must agree. Agreement
+URLs the same node/provider may be used. In dual mode, **task** observations
+are read at the lowest reported head height shared by both RPC URLs.
+Both endpoints must agree on the corresponding block hash before the
+historical contract reads and still agree immediately afterward.
+`rpcWitnessBlockNumber` / `rpcWitnessBlockHash` expose this snapshot
+identity; if either endpoint cannot provide historical state, SDK fails
+closed and never falls back to `latest`. The subsequent block hash check
+limits observation races; it does not provide atomic EIP-1898 hash-bound
+contract calls or finality. **Receipt** observations remain independently
+checked at each RPC's observation time; chain-head and confirmation counts
+may differ, but transaction, event positions, block hash and nonce must agree. Agreement
 does **not** prove finality, payment intent, task execution, or public
 Testnet acceptance.
 
