@@ -49,6 +49,9 @@ export interface ReadonlyBoundary {
 }
 export interface ObserveResult extends ReadonlyBoundary {
   readonly source:"RPC_READ_ONLY";
+  /** Common historical block only when rpcWitness is DUAL_RPC_MATCHED. */
+  readonly rpcWitnessBlockNumber:string|null;
+  readonly rpcWitnessBlockHash:string|null;
   readonly task:LedgerTask;
   readonly paymentStatus:"PaymentUnknown";
   readonly paymentVerified:false;
@@ -63,6 +66,9 @@ export interface ObserveResult extends ReadonlyBoundary {
 }
 export interface VerifyResult extends ReadonlyBoundary {
   readonly source:"CHAIN_ANCHOR_PLUS_LOCAL_BYTES";
+  /** Common historical block only when rpcWitness is DUAL_RPC_MATCHED. */
+  readonly rpcWitnessBlockNumber:string|null;
+  readonly rpcWitnessBlockHash:string|null;
   readonly match:true;readonly digest:string;
   readonly evidenceHash:string;
   /** Canonical Evidence JSON digest matched the Ledger anchor. */
