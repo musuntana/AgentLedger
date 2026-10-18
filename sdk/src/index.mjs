@@ -32,6 +32,8 @@ function sdkError(code,operation,message,retryable=false) {
   e.code=code;
   e.operation=operation;
   e.retryable=retryable; // retry ONLY read-only observation, NEVER charge
+  e.rpcStage="NONE"; // stable diagnostic, never expose transport response text
+  e.rpcRole="NONE";  // no URL or node identity returned
   e.paymentStatus="PaymentUnknown";
   e.chargeAgain=false;
   return e;
@@ -140,6 +142,33 @@ function classifyFailure(error,operation) {
 async function observeSafely(operation,callback){
   try{return await callback();}catch(error){throw classifyFailure(error,operation);}
 }
+// Viem wraps JSON-RPC failures in a cause chain. Only inspect these strings
+// internally; expose no raw RPC error, URL, node path, auth token or payload.
+function historicalRpcUnavailable(error) {
+  let current=error;
+  for(let depth=0;current && depth<6;depth++) {
+    if(current.code===-32601 || current.code===-32602) return true;
+    const fragments=[current.message,current.shortMessage,current.details];
+    if(fragments.some(part=>typeof part==="string" &&
+      /missing trie node|state (?:has been |is )?pruned|pruned state|historical state (?:not |un)available|archive node required|state data unavailable|method not found|unsupported block (?:height|number|tag)|header not found at requested height/i.test(part)))
+      return true;
+    current=current.cause;
+  }
+  return false;
+}
+async function rpcStep(operation,rpcStage,rpcRole,callback) {
+  try{return await callback();}
+  catch(error) {
+    const typed=(rpcStage==="HISTORICAL_STATE"||rpcStage==="BLOCK_HEADER") &&
+      historicalRpcUnavailable(error)
+      ? sdkError("SDK_HISTORICAL_STATE_UNAVAILABLE",operation,
+        "Configured RPC does not provide required historical data; use a history-capable endpoint; PaymentUnknown, do not recharge")
+      : classifyFailure(error,operation);
+    typed.rpcStage=rpcStage;
+    typed.rpcRole=rpcRole;
+    throw typed;
+  }
+}
 function verifyReceiptInput(expected,options){
   const op="reconcile";
   requireInput(expected!==null&&typeof expected==="object"&&!Array.isArray(expected),
@@ -190,39 +219,46 @@ export function createAgentLedgerVerifier(options={}) {
   const rpcWitness=witnessChain?"DUAL_RPC_MATCHED":"SINGLE_RPC";
   async function readTaskWitness(contract,taskId,operation) {
     if(!witnessChain) {
-      return {task:await readTask(chain,contract,taskId),blockNumber:null,blockHash:null};
+      const task=await rpcStep(operation,"CONTRACT_STATE","PRIMARY",
+        ()=>readTask(chain,contract,taskId));
+      return {task,blockNumber:null,blockHash:null};
     }
     // Use a common historical height, not two implicit 'latest' reads.
     // Each endpoint is checked before AND after eth_call against the same
     // canonical block hash. This is point-in-time agreement, not finality.
     const [primaryHead,witnessHead]=await Promise.all([
-      chain.getBlockNumber(),witnessChain.getBlockNumber()
+      rpcStep(operation,"HEAD","PRIMARY",()=>chain.getBlockNumber()),
+      rpcStep(operation,"HEAD","WITNESS",()=>witnessChain.getBlockNumber())
     ]);
     const height=primaryHead<witnessHead?primaryHead:witnessHead;
     const hexHeight="0x"+height.toString(16);
-    async function readHash(client) {
-      const block=await client.request({
-        method:"eth_getBlockByNumber",params:[hexHeight,false]
+    async function readHash(client,role) {
+      return rpcStep(operation,"BLOCK_HEADER",role,async()=>{
+        const block=await client.request({
+          method:"eth_getBlockByNumber",params:[hexHeight,false]
+        });
+        if(!block || typeof block.number!=="string" ||
+            !BLOCK_HEIGHT.test(block.number) || BigInt(block.number)!==height ||
+            !BLOCK_HASH.test(block.hash||""))
+          throw sdkError("SDK_OBSERVATION_UNAVAILABLE",operation,
+            "RPC historical block temporarily unavailable; PaymentUnknown, read-only recheck only",true);
+        return block.hash.toLowerCase();
       });
-      if(!block || typeof block.number!=="string" ||
-          !BLOCK_HEIGHT.test(block.number) || BigInt(block.number)!==height ||
-          !BLOCK_HASH.test(block.hash||""))
-        throw sdkError("SDK_OBSERVATION_UNAVAILABLE",operation,
-          "RPC historical block unavailable; PaymentUnknown, read-only recheck only",true);
-      return block.hash.toLowerCase();
     }
     const [firstHash,secondHash]=await Promise.all([
-      readHash(chain),readHash(witnessChain)
+      readHash(chain,"PRIMARY"),readHash(witnessChain,"WITNESS")
     ]);
     if(firstHash!==secondHash)
       throw sdkError("SDK_WITNESS_CONFLICT",operation,
         "RPC endpoints disagree on canonical block hash; PaymentUnknown, do not recharge");
     const [primaryTask,secondaryTask]=await Promise.all([
-      readTask(chain,contract,taskId,{blockNumber:height}),
-      readTask(witnessChain,contract,taskId,{blockNumber:height}),
+      rpcStep(operation,"HISTORICAL_STATE","PRIMARY",
+        ()=>readTask(chain,contract,taskId,{blockNumber:height})),
+      rpcStep(operation,"HISTORICAL_STATE","WITNESS",
+        ()=>readTask(witnessChain,contract,taskId,{blockNumber:height})),
     ]);
     const [primaryAfter,secondaryAfter]=await Promise.all([
-      readHash(chain),readHash(witnessChain)
+      readHash(chain,"PRIMARY"),readHash(witnessChain,"WITNESS")
     ]);
     if(primaryAfter!==firstHash || secondaryAfter!==firstHash)
       throw sdkError("SDK_WITNESS_CONFLICT",operation,
@@ -286,9 +322,11 @@ export function createAgentLedgerVerifier(options={}) {
     async reconcile(expected,options={}){
       return observeSafely("reconcile",async()=>{
         const {descriptor,minConfirmations}=verifyReceiptInput(expected,options); // BEFORE any network
-        const payment=await verifyLive(descriptor,rpcUrl,fetch,{minConfirmations});
+        const payment=await rpcStep("reconcile","RECEIPT","PRIMARY",
+          ()=>verifyLive(descriptor,rpcUrl,fetch,{minConfirmations}));
         if(witnessRpcUrl) {
-          const second=await verifyLive(descriptor,witnessRpcUrl,fetch,{minConfirmations});
+          const second=await rpcStep("reconcile","RECEIPT","WITNESS",
+            ()=>verifyLive(descriptor,witnessRpcUrl,fetch,{minConfirmations}));
           requireWitnessMatch(payment,second,PAYMENT_WITNESS_FIELDS,"reconcile");
         }
         return freezeSnapshot({
