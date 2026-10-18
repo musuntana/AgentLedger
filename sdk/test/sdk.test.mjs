@@ -32,7 +32,7 @@ const payload={
   modelOrTool:"bounded-statistics",outputSha256:"0x"+"44".repeat(32),
   schemaVersion:"agentledger.evidence.v1",taskId:ID,
 };
-async function localRpc(t,{chainId="0x279f",status=3,evidence=payload}={}){
+async function localRpc(t,{chainId="0x279f",status=3,evidence=payload,onRequest=()=>{}}={}){
   const digest="0x"+createHash("sha256").update(JSON.stringify(evidence)).digest("hex");
   const task={
     creator:CONTRACT,payer:CONTRACT,amount:1000n,maxBudget:2000n,
@@ -48,6 +48,7 @@ async function localRpc(t,{chainId="0x279f",status=3,evidence=payload}={}){
       const chunks=[];for await(const chunk of req)chunks.push(chunk);
       parsed=JSON.parse(Buffer.concat(chunks).toString("utf8"));
       calls.push(parsed.method);
+      onRequest(parsed.method);
       const results={eth_chainId:chainId,eth_getCode:"0x6001",eth_call:encoded};
       const body=JSON.stringify({jsonrpc:"2.0",id:parsed.id,result:results[parsed.method]??null});
       res.writeHead(200,{"content-type":"application/json"});res.end(body);
@@ -286,4 +287,43 @@ test("canonical Evidence match is separate from original-file coverage",async t=
   assert.equal(complete.chargeAgain,false);
   await assert.rejects(()=>sdk.verify(CONTRACT,ID,evidence,{inputBytes:input,outputBytes:new Uint8Array([0])}),
     e=>e.code==="SDK_EVIDENCE_MISMATCH"&&e.chargeAgain===false);
+});
+
+test("verify snapshots caller-owned Evidence and source buffers before asynchronous RPC",async t=>{
+  const digest=bytes=>"0x"+createHash("sha256").update(bytes).digest("hex");
+  const input=new Uint8Array([10,20,30,40]);
+  const outputBacking=new Uint8Array([99,1,2,3,4,5]);
+  const output=new DataView(outputBacking.buffer,1,4);
+  const evidence={...payload,inputSha256:digest(input),outputSha256:digest(new Uint8Array(output.buffer,output.byteOffset,output.byteLength))};
+  const canonical={...evidence};
+  let changed=false;
+  const rpc=await localRpc(t,{evidence:canonical,onRequest(method){
+    if(method==="eth_chainId"&&!changed){
+      changed=true;
+      evidence.executor="mutated while reading RPC";
+      input[0]=255;
+      outputBacking[1]=255;
+    }
+  }});
+  const sdk=createAgentLedgerVerifier({rpcUrl:rpc.url});
+  const result=await sdk.verify(CONTRACT,ID,evidence,{inputBytes:input,outputBytes:output});
+  assert.equal(changed,true);
+  assert.equal(result.evidenceDigestMatched,true);
+  assert.equal(result.originalFilesCoverage,"BOTH_MATCHED");
+  assert.equal(result.paymentStatus,"PaymentUnknown");
+  assert.equal(result.chargeAgain,false);
+});
+
+test("oversized local files fail before any RPC and cannot be classified as network retry",async t=>{
+  const rpc=await localRpc(t);
+  const sdk=createAgentLedgerVerifier({rpcUrl:rpc.url});
+  const tooLarge=new Uint8Array(10*1024*1024+1);
+  await assert.rejects(()=>sdk.verify(CONTRACT,ID,payload,{inputBytes:tooLarge}),e=>{
+    assert.equal(e.code,"SDK_INVALID_INPUT");
+    assert.equal(e.retryable,false);
+    assert.equal(e.operation,"verify");
+    assert.equal(e.chargeAgain,false);
+    return true;
+  });
+  assert.equal(rpc.calls.length,0);
 });
