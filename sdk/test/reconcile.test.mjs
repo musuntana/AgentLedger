@@ -137,3 +137,19 @@ test("reconcile snapshots expected descriptor before asynchronous receipt observ
   assert.equal(result.chargeAgain,false);
   assert.equal(Object.isFrozen(result),true);
 });
+
+test("receipt accessors and inherited required fields cannot change validation after snapshot",async t=>{
+  const rpc=await localSettlement(t);
+  const sdk=createAgentLedgerVerifier({rpcUrl:rpc.url});
+  const getter=Object.defineProperty({...expected},"transaction",{
+    enumerable:true,configurable:true,get:()=>transaction,
+  });
+  const inherited=Object.create({transaction});
+  Object.assign(inherited,{...expected});
+  delete inherited.transaction;
+  for(const invalid of [getter,inherited]){
+    await assert.rejects(()=>sdk.reconcile(invalid),error=>
+      error.code==="SDK_INVALID_INPUT"&&error.retryable===false&&error.chargeAgain===false);
+    assert.equal(rpc.calls.length,0);
+  }
+});
