@@ -13,13 +13,18 @@ export type AgentLedgerSdkErrorCode =
   |"SDK_INVALID_INPUT"|"SDK_INVALID_EVIDENCE"|"SDK_CHAIN_MISMATCH"
   |"SDK_EVIDENCE_MISMATCH"|"SDK_TASK_UNAVAILABLE"
   |"SDK_SETTLEMENT_INCONSISTENT"|"SDK_SETTLEMENT_PENDING"
-  |"SDK_WITNESS_CONFLICT"|"SDK_OBSERVATION_UNAVAILABLE";
+  |"SDK_WITNESS_CONFLICT"|"SDK_HISTORICAL_STATE_UNAVAILABLE"
+  |"SDK_OBSERVATION_UNAVAILABLE";
 export interface AgentLedgerSdkError extends Error {
   readonly name:"AgentLedgerSDKError";
   readonly code:AgentLedgerSdkErrorCode;
   readonly operation:"create"|"observe"|"verify"|"reconcile";
   /** Only the read-only operation may be retried. NEVER a payment. */
   readonly retryable:boolean;
+  /** Sanitized diagnostic stage; never an RPC URL or raw response. */
+  readonly rpcStage:"NONE"|"HEAD"|"BLOCK_HEADER"|"HISTORICAL_STATE"|"CONTRACT_STATE"|"RECEIPT";
+  /** Sanitized endpoint role; does not assert independent providers. */
+  readonly rpcRole:"NONE"|"PRIMARY"|"WITNESS";
   readonly paymentStatus:"PaymentUnknown";
   readonly chargeAgain:false;
 }
