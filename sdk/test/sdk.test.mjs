@@ -32,7 +32,9 @@ const payload={
   modelOrTool:"bounded-statistics",outputSha256:"0x"+"44".repeat(32),
   schemaVersion:"agentledger.evidence.v1",taskId:ID,
 };
-async function localRpc(t,{chainId="0x279f",status=3,evidence=payload,onRequest=()=>{}}={}){
+async function localRpc(t,{chainId="0x279f",status=3,evidence=payload,
+  onRequest=()=>{},headBlock="0x65",blockHash="0x"+"ab".repeat(32),
+  blockHashes=null,statusAtBlock=null,missingHistorical=false}={}){
   const digest="0x"+createHash("sha256").update(JSON.stringify(evidence)).digest("hex");
   const task={
     creator:CONTRACT,payer:CONTRACT,amount:1000n,maxBudget:2000n,
@@ -41,22 +43,39 @@ async function localRpc(t,{chainId="0x279f",status=3,evidence=payload,onRequest=
     createdAt:1n,paidAt:2n,provenAt:3n,
   };
   const encoded=encodeFunctionResult({abi:TASK_ABI,functionName:"getTask",result:task});
-  const calls=[];
+  const historicEncoded=statusAtBlock===null?encoded:encodeFunctionResult({
+    abi:TASK_ABI,functionName:"getTask",result:{...task,status:statusAtBlock}
+  });
+  const calls=[],requests=[];
+  let blockReads=0;
   const server=createServer(async(req,res)=>{
     let parsed;
     try{
       const chunks=[];for await(const chunk of req)chunks.push(chunk);
       parsed=JSON.parse(Buffer.concat(chunks).toString("utf8"));
       calls.push(parsed.method);
+      requests.push(parsed);
       onRequest(parsed.method);
-      const results={eth_chainId:chainId,eth_getCode:"0x6001",eth_call:encoded};
-      const body=JSON.stringify({jsonrpc:"2.0",id:parsed.id,result:results[parsed.method]??null});
+      const historicalCall=parsed.params?.[1]==="0x64";
+      let result;
+      if(parsed.method==="eth_getBlockByNumber") {
+        const requested=parsed.params?.[0];
+        const hash=blockHashes?.[blockReads]??blockHash;
+        blockReads++;
+        result=missingHistorical?null:{number:requested,hash};
+      } else if(parsed.method==="eth_call") {
+        result=historicalCall?historicEncoded:encoded;
+      } else {
+        const results={eth_chainId:chainId,eth_getCode:"0x6001",eth_blockNumber:headBlock};
+        result=results[parsed.method]??null;
+      }
+      const body=JSON.stringify({jsonrpc:"2.0",id:parsed.id,result});
       res.writeHead(200,{"content-type":"application/json"});res.end(body);
     }catch(error){res.writeHead(500);res.end();}
   });
   await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
   t.after(()=>new Promise(resolve=>server.close(resolve)));
-  return {url:"http://127.0.0.1:"+server.address().port,calls};
+  return {url:"http://127.0.0.1:"+server.address().port,calls,requests};
 }
 test("public package exports ONLY factory and metadata, no fixture parser or transport injector",async()=>{
   const exports=Object.keys(await import("../dist/index.mjs")).sort();
@@ -334,12 +353,15 @@ test("opt-in second RPC matches recorder task facts without upgrading payment",a
   const sdk=createAgentLedgerVerifier({rpcUrl:first.url,witnessRpcUrl:second.url});
   const observation=await sdk.observe(CONTRACT,ID);
   assert.equal(observation.rpcWitness,"DUAL_RPC_MATCHED");
+  assert.equal(observation.rpcWitnessBlockNumber,"101");
+  assert.equal(observation.rpcWitnessBlockHash,"0x"+"ab".repeat(32));
   assert.equal(observation.status.state,"PaymentUnknown");
   assert.equal(observation.finalityProven,false);
   assert.ok(first.calls.includes("eth_call"));
   assert.ok(second.calls.includes("eth_call"));
   const evidence=await sdk.verify(CONTRACT,ID,payload);
   assert.equal(evidence.rpcWitness,"DUAL_RPC_MATCHED");
+  assert.equal(evidence.rpcWitnessBlockNumber,"101");
   assert.equal(evidence.match,true);
   assert.equal(evidence.chargeAgain,false);
 });
@@ -387,5 +409,61 @@ test("witness URL trust and identical origin fail at construction",async t=>{
       e=>e.operation==="create"&&!e.retryable&&e.chargeAgain===false);
   }
   const instance=createAgentLedgerVerifier({rpcUrl:rpc.url});
-  assert.equal((await instance.observe(CONTRACT,ID)).rpcWitness,"SINGLE_RPC");
+  const observation=await instance.observe(CONTRACT,ID);
+  assert.equal(observation.rpcWitness,"SINGLE_RPC");
+  assert.equal(observation.rpcWitnessBlockNumber,null);
+  assert.equal(observation.rpcWitnessBlockHash,null);
+  assert.equal(rpc.calls.includes("eth_getBlockByNumber"),false);
+});
+
+test("different RPC latest states share a single historical block for observe and verify",async t=>{
+  const before=await localRpc(t,{headBlock:"0x64",status:3,statusAtBlock:2});
+  const ahead=await localRpc(t,{headBlock:"0x66",status:3,statusAtBlock:2});
+  // Different latest heads, identical historical task facts. The mocked
+  // getTask response deliberately differs at latest versus block 0x64.
+  const sdk=createAgentLedgerVerifier({rpcUrl:before.url,witnessRpcUrl:ahead.url});
+  const observed=await sdk.observe(CONTRACT,ID);
+  assert.equal(observed.rpcWitness,"DUAL_RPC_MATCHED");
+  assert.equal(observed.rpcWitnessBlockNumber,"100");
+  assert.equal(observed.task.status,"Paid");
+  assert.equal(observed.paymentStatus,"PaymentUnknown");
+  for(const rpc of [before,ahead]){
+    const calls=rpc.requests.filter(x=>x.method==="eth_call");
+    assert.ok(calls.length>0);
+    assert.ok(calls.every(x=>x.params?.[1]==="0x64"));
+    const code=rpc.requests.filter(x=>x.method==="eth_getCode");
+    assert.ok(code.every(x=>x.params?.[1]==="0x64"));
+  }
+  // Verified historical task is Paid: Evidence must not be promoted to Proven.
+  await assert.rejects(()=>sdk.verify(CONTRACT,ID,payload),e=>
+    e.code==="SDK_EVIDENCE_MISMATCH"&&e.chargeAgain===false);
+});
+
+test("different canonical block hashes at the same height are a witness conflict",async t=>{
+  const a=await localRpc(t,{headBlock:"0x65"});
+  const b=await localRpc(t,{headBlock:"0x65",blockHash:"0x"+"cc".repeat(32)});
+  const sdk=createAgentLedgerVerifier({rpcUrl:a.url,witnessRpcUrl:b.url});
+  await assert.rejects(()=>sdk.observe(CONTRACT,ID),e=>
+    e.code==="SDK_WITNESS_CONFLICT"&&!e.retryable&&e.chargeAgain===false);
+  assert.equal(a.calls.includes("eth_call"),false);
+  assert.equal(b.calls.includes("eth_call"),false);
+});
+
+test("reorg during dual-RPC task read fails closed after historical eth_call",async t=>{
+  const oldHash="0x"+"ab".repeat(32),newHash="0x"+"dd".repeat(32);
+  const a=await localRpc(t,{blockHashes:[oldHash,newHash]});
+  const b=await localRpc(t,{blockHash:oldHash});
+  const sdk=createAgentLedgerVerifier({rpcUrl:a.url,witnessRpcUrl:b.url});
+  await assert.rejects(()=>sdk.verify(CONTRACT,ID,payload),e=>
+    e.code==="SDK_WITNESS_CONFLICT"&&e.operation==="verify"&&e.chargeAgain===false);
+  assert.ok(a.calls.includes("eth_call"));
+});
+
+test("unavailable historical block refuses dual witness without implicit latest fallback",async t=>{
+  const a=await localRpc(t);
+  const b=await localRpc(t,{missingHistorical:true});
+  const sdk=createAgentLedgerVerifier({rpcUrl:a.url,witnessRpcUrl:b.url});
+  await assert.rejects(()=>sdk.observe(CONTRACT,ID),e=>
+    e.code==="SDK_OBSERVATION_UNAVAILABLE"&&e.retryable===true&&e.chargeAgain===false);
+  assert.equal(a.calls.includes("eth_call"),false);
 });
