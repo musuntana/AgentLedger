@@ -36,6 +36,10 @@ jobs:
         run: python3 -m pip install --upgrade pytest playwright==1.56.0
       - name: Node + SDK + Python suite
         run: npm test
+      - name: SDK consumer types and npm pack safety
+        run: |
+          npm --prefix sdk run typecheck
+          npm --prefix sdk run packcheck
       - name: Offline readiness check
         run: node tools/onsite-check.mjs
       - name: Portable judge handoff check (offline, no publication)
