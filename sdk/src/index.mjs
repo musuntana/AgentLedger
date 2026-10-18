@@ -24,6 +24,7 @@ const NONCE=/^0x[0-9a-fA-F]{64}$/;
 const ADDRESS=/^0x[0-9a-fA-F]{40}$/;
 const DECIMAL=/^[1-9][0-9]*$/;
 const DENY_TRANSPORT="Injected transport/client is forbidden in public SDK; use rpcUrl. No receipt or charge attempted";
+const MAX_SOURCE_BYTES=10*1024*1024; // Align with Studio's bounded local file reads.
 
 function sdkError(code,operation,message,retryable=false) {
   const e=new Error(message);
@@ -51,6 +52,35 @@ function originalFilesCoverage(inputChecked,outputChecked) {
   return inputChecked && outputChecked ? "BOTH_MATCHED" :
     inputChecked || outputChecked ? "PARTIAL_MATCHED" : "NOT_SUPPLIED";
 }
+// Never retain caller-owned mutable BufferSource objects across awaited RPCs.
+// The slice also respects a DataView/Buffer's byteOffset and byteLength.
+function snapshotBytes(value,name) {
+  if(value===null)return null;
+  requireInput(value instanceof ArrayBuffer || ArrayBuffer.isView(value),
+    "verify",name+" must be raw bytes");
+  let bytes;
+  try {
+    bytes=value instanceof ArrayBuffer ? new Uint8Array(value) :
+      new Uint8Array(value.buffer,value.byteOffset,value.byteLength);
+    requireInput(bytes.byteLength<=MAX_SOURCE_BYTES,"verify",
+      name+" exceeds 10 MiB local verification limit");
+    return bytes.slice();
+  } catch(error) {
+    if(error?.name==="AgentLedgerSDKError")throw error;
+    throw sdkError("SDK_INVALID_INPUT","verify",name+" has unavailable raw bytes");
+  }
+}
+// Copy only fields admitted by the already-validated descriptor schema.
+// A caller may mutate their original object while asynchronous RPC runs.
+function snapshotReceipt(expected) {
+  return Object.freeze({
+    network:expected.network,taskId:expected.taskId,
+    transaction:expected.transaction,payer:expected.payer,
+    payTo:expected.payTo,amountAtomic:expected.amountAtomic,
+    paymentNonce:expected.paymentNonce,
+    ...(expected.token===undefined?{}:{token:expected.token}),
+  });
+}
 function safeRpcUrl(value){
   requireInput(typeof value==="string"&&value.length>0&&value.length<=2048,
     "create","rpcUrl must be a non-empty string");
@@ -73,8 +103,14 @@ function classifyFailure(error,operation) {
     return sdkError("SDK_EVIDENCE_MISMATCH",operation,"Evidence SHA-256 mismatch or task anchor unavailable");
   if(/Unexpected or missing Evidence|Invalid (completedAt|inputSha256|outputSha256|executor|modelOrTool|taskId)|Unsupported Evidence|Evidence must/i.test(message))
     return sdkError("SDK_INVALID_EVIDENCE",operation,"Invalid canonical Evidence payload");
+  // Pending observations are safe to repeat ONLY as read-only queries.
+  // A missing receipt or shallow confirmation count never proves nonpayment.
   if(operation==="reconcile" &&
-    /transaction hash mismatch|transaction reverted|expected exactly one matching|nonce|incorrect network|only official Monad Testnet USDC|confirmation threshold|receipt block is no longer canonical|log block mismatch|log transaction mismatch|x402 .*mismatch/i.test(message))
+    /transaction receipt missing|confirmation threshold not reached/i.test(message))
+    return sdkError("SDK_SETTLEMENT_PENDING",operation,
+      "Payment receipt pending or insufficient confirmations; PaymentUnknown, read-only recheck only",true);
+  if(operation==="reconcile" &&
+    /transaction hash mismatch|transaction reverted|expected exactly one matching|nonce|incorrect network|only official Monad Testnet USDC|receipt block is no longer canonical|canonical block height mismatch|receipt logs missing|log block mismatch|log transaction mismatch|unsafe logIndex|x402 .*mismatch/i.test(message))
     return sdkError("SDK_SETTLEMENT_INCONSISTENT",operation,
       "Receipt, USDC transfer, authorization nonce or canonical chain witness inconsistent; PaymentUnknown, do not recharge");
   if(/invalid contract address|invalid bytes32 task ID/i.test(message))
@@ -157,18 +193,17 @@ export function createAgentLedgerVerifier(options={}) {
         requireInput(Object.keys(options).every(k=>k==="inputBytes"||k==="outputBytes"),
           "verify","Unknown Evidence verification option");
         const {inputBytes=null,outputBytes=null}=options;
-        for(const [name,value] of [["inputBytes",inputBytes],["outputBytes",outputBytes]]){
-          requireInput(value===null||value instanceof ArrayBuffer||ArrayBuffer.isView(value),
-            "verify",name+" must be raw bytes");
-        }
-        // Validate local Evidence BEFORE RPC: malformed inputs must not
-        // contact a node, even when the node is unavailable.
-        canonicalEvidence(evidence);
-        requireInput(typeof evidence.taskId==="string", "verify", "Evidence task ID required");
-        if(evidence.taskId!==taskId.toLowerCase())
+        const inputSnapshot=snapshotBytes(inputBytes,"inputBytes");
+        const outputSnapshot=snapshotBytes(outputBytes,"outputBytes");
+        // Both canonical Evidence and optional source bytes are captured
+        // synchronously before the first await. Never hash mutated caller
+        // objects/bytes after observing a task through RPC.
+        const canonical=canonicalEvidence(evidence);
+        const evidenceSnapshot=JSON.parse(canonical);
+        if(evidenceSnapshot.taskId!==taskId.toLowerCase())
           throw sdkError("SDK_EVIDENCE_MISMATCH","verify","Evidence task ID does not match the requested task");
         const task=await readTask(chain,contract,taskId);
-        const matched=await verifyEvidence(evidence,task,inputBytes,outputBytes);
+        const matched=await verifyEvidence(evidenceSnapshot,task,inputSnapshot,outputSnapshot);
         return freezeSnapshot({
           ...matched,
           evidenceDigestMatched:true,
@@ -184,7 +219,8 @@ export function createAgentLedgerVerifier(options={}) {
     async reconcile(expected,options={}){
       return observeSafely("reconcile",async()=>{
         const validated=verifyReceiptInput(expected,options); // BEFORE any network
-        const payment=await verifyLive(expected,rpcUrl,fetch,validated);
+        const expectedSnapshot=snapshotReceipt(expected);
+        const payment=await verifyLive(expectedSnapshot,rpcUrl,fetch,validated);
         return freezeSnapshot({
           schemaVersion:SDK_SCHEMA,sdkVersion:SDK_VERSION,source:"USDC_RECEIPT_ONLY",
           paymentEventObserved:true,nonce:payment.paymentNonce,
