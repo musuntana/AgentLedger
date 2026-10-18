@@ -27,7 +27,7 @@ for (const [path, file, type] of [
     ['/mon/' + name + '.mjs', 'mon/' + name + '.mjs', 'text/javascript; charset=utf-8']),
 ]) assets.set(path, [file, type]);
 const verifierHandler = createVerifierHandler();
-const studioPaths = new Set(['/studio', '/demo', '/app.mjs', '/demo-scenarios.mjs', '/demo-guide.mjs', '/text-stats.mjs', '/summary.mjs', '/evidence-browser.mjs', '/locale.mjs', '/locale-copy.mjs']);
+const studioPaths = new Set(['/studio', '/demo', '/app.mjs', '/demo-scenarios.mjs', '/demo-guide.mjs', '/text-stats.mjs', '/summary.mjs', '/verdict-matrix.mjs', '/evidence-browser.mjs', '/locale.mjs', '/locale-copy.mjs']);
 const server = createServer((req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
   if (studioPaths.has(path) || path.startsWith('/api/')) {

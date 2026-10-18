@@ -13,6 +13,8 @@
   "description": "AgentLedger - Pay → Execute → Prove (Monad testnet experiment)",
   "scripts": {
     "dev": "node tools/dev.mjs",
+    "wallet:dev": "node tools/testnet-dev-wallet.mjs",
+    "dev:observe": "node examples/verifier/tools/dev-observe.mjs",
     "start": "npm --prefix examples/verifier start",
     "deploy:testnet": "npm --prefix examples/verifier run deploy:testnet",
     "test": "npm run test:node && npm run test:sdk && npm run test:python",

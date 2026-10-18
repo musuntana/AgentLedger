@@ -155,3 +155,18 @@ npm run build:judge:en
 浏览器检查需要 Chrome 或 Chromium，可通过 `AGENTLEDGER_CHROME_PATH` 指定路径；Anvil 检查另需 Foundry。伴随应用还有独立的 `test:browser:live` 命令，会将只读观察记录写入 `out/pocket-live-testnet/`；该目录采用只写一次的方式，重跑前应先保留历史证据，再处理原输出目录。
 
 持续集成配置见[工作流](.github/workflows/ci.yml)，实际执行情况以对应提交的运行结果为准。公开测试网支付的正式验收要求见[验收说明](docs/live-testnet-observation.md)。
+
+## 评委快速导航与诚实结果（Verification Matrix）
+
+| 我想验证什么 | 去哪里 | 结论范围 |
+| --- | --- | --- |
+| 任务创建、付款声明、证据、篡改、丢 ACK | `/demo` → Honest Results | **LOCAL / SIMULATED ONLY**；实际本地哈希运算不代表链上付款 |
+| 当前公共链任务身份及创建交易 | `/studio` → Testnet lookup | **TESTNET / READ ONLY**；需逐次读取并核对原始回执 |
+| 提交原始文件重新核验摘要 | `/studio` → Evidence lab | 字节一致 ≠ 执行正确 ≠ 付款最终性 |
+| 自行确认真实测试 MON 转账 | `/mon` | 独立实验，钱包逐笔签名；不是 USDC/x402 验收 |
+
+**Honest Results 面板**按 Claim / Checked by / State 显示当前已检查和未检查的事实：`PaymentUnknown`、`NOT_VERIFIED` 及 `TAMPER_REJECTED` 会保留，而不是统一显示绿色通过。Lost ACK 只能恢复原始付款事实，不允许根据超时自动再次扣费（**NO RECHARGE**）。
+
+`summary.json` 的 `metrics.readPathLatencyMs` 是浏览器 → 服务 → RPC 的端到端读取耗时，**不是 RPC 服务端延迟，也不代表区块确认时间**；只有创建交易回执与规范区块经过核对，`creationReceiptBlockNumber`、`creationReceiptBlockHash` 才非空。当前 Studio 没有独立的支付回执与 Evidence 锚定回执，因此 `paymentToEvidenceBlockSpan`、`writeGasUsedWei` 必须为 `null`。本地模拟中的所有链上观测指标也必须为 `null`，不能编造 Monad 并行效率数字。
+
+**常见异议：为什么把记录放在链上？** 用不可随意改写的任务状态和摘要锚点提供公开可查询的参照；链本身不负责判断业务执行质量，不能替代独立支付对账、执行证明和最终性政策。**Proven 能否证明执行正确？** 不能；它只表示摘要已被允许的提交者锚定。**是否能声称真实 USDC 支付完整验收？** 当前 reviewed deployment 列表为空，不能，须保留 `BLOCKED_NO_REVIEWED_DEPLOYMENT`。

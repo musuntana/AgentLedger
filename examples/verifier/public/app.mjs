@@ -2,8 +2,9 @@
 import { verifyEvidence } from './evidence-browser.mjs';
 import { buildDemoCase } from './demo-scenarios.mjs';
 import { makeSummary, RPC_LABEL } from './summary.mjs';
+import { verificationMatrix, observationMetrics, verdictStateLabel, verdictTone } from './verdict-matrix.mjs';
 import { DEMO_STEPS, validShowcase } from './demo-guide.mjs';
-import { initLanguage } from './locale.mjs';
+import { initLanguage, language, localize } from './locale.mjs';
 
 const byId = id => document.getElementById(id);
 const HEX40 = /^0x[0-9a-fA-F]{40}$/;
@@ -22,7 +23,8 @@ for (const link of document.querySelectorAll('[data-workspace-target]')) {
 }
 let currentMode = 'demo', currentDemo = null, loadedTask = null;
 let lookupSequence = 0, verificationSequence = 0, evidenceVerification = 'NOT_RUN';
-let liveAbort = null, observedAt = null, creationObservation = null;
+let evidenceSourceChecks = { inputChecked: false, outputChecked: false };
+let liveAbort = null, observedAt = null, creationObservation = null, liveReadPathLatencyMs = null;
 let guideIndex = -1, guideBusy = false, guideGeneration = 0;
 function text(id, value) { byId(id).textContent = String(value ?? '—'); }
 function message(id, value, tone = '') {
@@ -34,8 +36,43 @@ function proofButtons(busy = false) {
   byId('run-sample-proof').disabled = busy || !proven || currentMode !== 'demo';
   byId('tamper-proof').disabled = busy || !proven || currentMode !== 'demo';
 }
+function renderVerdicts() {
+  const simulation = currentMode === 'demo';
+  text('verdict-source', simulation ? 'LOCAL / SIMULATED ONLY' : loadedTask ? 'TESTNET / READ ONLY' : 'TESTNET / NOT QUERIED');
+  const rows = verificationMatrix({simulation, task:loadedTask, verification:evidenceVerification,
+    creation:creationObservation, ...evidenceSourceChecks});
+  const tbody = byId('verification-matrix-body');
+  tbody.replaceChildren(...rows.map(row => {
+    const tr = document.createElement('tr');
+    for (const field of ['claim','checkedBy','state']) {
+      const td = document.createElement('td');
+      td.textContent = field === 'state'
+        ? verdictStateLabel(row.state, language()) : localize(row[field]);
+      if (field === 'state') {
+        td.dataset.state = row.state; // Preserve the unlocalized machine state.
+        td.className = verdictTone(row.state);
+      }
+      tr.append(td);
+    }
+    return tr;
+  }));
+  const metrics = observationMetrics({simulation,readPathLatencyMs:liveReadPathLatencyMs,creation:creationObservation});
+  text('metric-read-latency', metrics.readPathLatencyMs === null
+    ? 'NOT MEASURED' : metrics.readPathLatencyMs + ' ms · browser → service → RPC');
+  text('metric-creation-block', metrics.creationReceiptBlockNumber === null
+    ? 'NOT VERIFIED' : metrics.creationReceiptBlockNumber + ' · receipt & canonical block checked');
+  text('metric-block-span', 'NOT MEASURED · independent payment/evidence receipts required');
+  text('metric-write-gas', 'NOT ATTRIBUTABLE · read-only Studio spends no gas');
+  text('honest-outcome', !loadedTask ? 'NOT RUN · no selected task'
+    : simulation ? (evidenceVerification === 'TAMPER_REJECTED'
+      ? 'EXPECTED REJECTION · local tampering detected; no real payment'
+      : 'LOCAL SIMULATION ONLY · no public payment accepted')
+    : 'TASK OBSERVED ONLY · payment and finality remain unverified');
+}
+document.addEventListener('agentledger:language', renderVerdicts);
 function displayTask(task, kind = 'SIMULATION') {
-  loadedTask = task; evidenceVerification = 'NOT_RUN'; verificationSequence++;
+  loadedTask = task; evidenceVerification = 'NOT_RUN';
+  evidenceSourceChecks = { inputChecked: false, outputChecked: false }; verificationSequence++;
   const live = kind === 'TESTNET';
   text('task-network', live ? 'Monad Testnet · 10143' : 'Local simulation · NOT CHAIN');
   for (const [id, field] of Object.entries({ 'task-value': 'taskId', 'task-description': 'descriptionHash', 'task-contract': 'contract', 'task-creator': 'creator', 'task-payer': 'payer', 'task-amount': 'amountAtomic', 'task-budget': 'maxBudgetAtomic', 'task-settlement': 'settlementRef', 'task-hash': 'evidenceHash' })) text(id, task[field]);
@@ -60,12 +97,13 @@ function displayTask(task, kind = 'SIMULATION') {
     text('observed-at', '本次读取时间：' + new Date(observedAt).toLocaleString());
   }
   for (const id of ['evidence-file', 'input-file', 'output-file']) byId(id).value = '';
-  proofButtons();
+  proofButtons(); renderVerdicts();
   message('verification-message', task.status === 'Proven' ? (live ? 'Choose original Evidence files to compare with chain hash.' : 'Verify the generated fixture or download its exact files.') : 'A Proven task is required before Evidence verification.');
 }
 function clearTask() {
-  loadedTask = null; currentDemo = null; observedAt = null; creationObservation = null;
-  evidenceVerification = 'NOT_RUN'; verificationSequence++;
+  loadedTask = null; currentDemo = null; observedAt = null; creationObservation = null; liveReadPathLatencyMs = null;
+  evidenceVerification = 'NOT_RUN'; evidenceSourceChecks = { inputChecked: false, outputChecked: false };
+  verificationSequence++;
   proofButtons();
   text('observation-title', 'No task selected'); text('ledger-badge', 'UNKNOWN');
   byId('ledger-badge').className = 'state-pill';
@@ -77,7 +115,7 @@ function clearTask() {
   text('payment-transfer', 'NOT VERIFIED'); text('payment-nonce', 'NOT VERIFIED');
   for (const id of ['contract-link', 'tool-preview', 'fixture-downloads', 'live-share', 'creation-transaction']) byId(id).hidden = true;
   byId('save-summary').disabled = true;
-  message('verification-message', 'Load a Proven task to verify Evidence.');
+  message('verification-message', 'Load a Proven task to verify Evidence.'); renderVerdicts();
 }
 function switchMode(mode) {
   lookupSequence++; liveAbort?.abort(); currentMode = mode;
@@ -121,6 +159,7 @@ async function queryTask(contract, taskId, creationTransaction = null) {
   clearTask(); const sequence = ++lookupSequence;
   if (!HEX40.test(contract) || !HEX64.test(taskId)) { message('query-message', 'Enter a valid contract address and bytes32 task ID.', 'error'); return false; }
   byId('query-button').disabled = true;
+  const readStarted = performance.now();
   message('query-message', 'Querying Monad Testnet RPC …');
   const timeout = setTimeout(() => controller.abort(), 20000);
   try {
@@ -136,6 +175,7 @@ async function queryTask(contract, taskId, creationTransaction = null) {
     }
     if (sequence !== lookupSequence || currentMode !== 'live') return false;
     observedAt = new Date().toISOString(); creationObservation = creation;
+    liveReadPathLatencyMs = Math.round(performance.now() - readStarted);
     byId('network-indicator').dataset.state = 'verified';
     text('studio-network-status', 'Chain ID 10143 · RPC checked');
     displayTask(task, 'TESTNET');
@@ -186,6 +226,8 @@ async function checkEvidence(evidence, input, output, context) {
   const result = await verifyEvidence(evidence, context.task, input, output);
   if (!isCurrent(context)) return false;
   evidenceVerification = 'HASH_MATCHED';
+  evidenceSourceChecks = { inputChecked: result.inputChecked, outputChecked: result.outputChecked };
+  renderVerdicts();
   text('evidence-fact', context.mode === 'demo' ? 'SIMULATED · Hash matched' : 'Hash matched to chain anchor');
   text('evidence-detail', context.mode === 'demo' ? 'Local-only simulated anchor, not a Monad transaction.' : 'Canonical Evidence bytes match on-chain hash; payment remains unknown.');
   message('verification-message', (context.mode === 'demo' ? 'SIMULATED MATCH' : 'HASH MATCH') + ': ' + result.digest + '. Original input ' + (result.inputChecked ? 'verified' : 'not supplied') + '; output ' + (result.outputChecked ? 'verified' : 'not supplied') + '. No payment or execution correctness claim.', 'success');
@@ -193,7 +235,8 @@ async function checkEvidence(evidence, input, output, context) {
 }
 function verificationFailure(error, context, tamper = false) {
   if (!isCurrent(context)) return;
-  evidenceVerification = 'NOT_VERIFIED'; text('evidence-fact', tamper ? 'SIMULATED · Tampered output rejected' : 'Not verified');
+  evidenceVerification = tamper ? 'TAMPER_REJECTED' : 'NOT_VERIFIED';
+  evidenceSourceChecks = { inputChecked: false, outputChecked: false }; renderVerdicts(); text('evidence-fact', tamper ? 'SIMULATED · Tampered output rejected' : 'Not verified');
   text('evidence-detail', error.message);
   message('verification-message', (tamper ? 'EXPECTED REJECTION: ' : 'NOT VERIFIED: ') + error.message, tamper ? 'success' : 'error');
 }
@@ -201,6 +244,7 @@ async function runSampleProof(tamper = false) {
   if (currentMode !== 'demo' || currentDemo?.task.status !== 'Proven') return false;
   const context = verificationContext(), sample = currentDemo;
   proofButtons(true); evidenceVerification = 'NOT_RUN';
+  evidenceSourceChecks = { inputChecked: false, outputChecked: false }; renderVerdicts();
   message('verification-message', tamper ? 'Changing one output byte before checking…' : 'Hashing local input, output and Evidence…');
   try {
     const output = sample.outputBytes.slice(); if (tamper) output[0] ^= 1;
@@ -220,6 +264,7 @@ async function chosenFile(id, maxBytes) {
 byId('verify-button').addEventListener('click', async () => {
   if (loadedTask?.status !== 'Proven') return;
   cancelGuide(); const context = verificationContext(); proofButtons(true); evidenceVerification = 'NOT_RUN';
+  evidenceSourceChecks = { inputChecked: false, outputChecked: false }; renderVerdicts();
   message('verification-message', 'Computing SHA-256 entirely in this browser …');
   try {
     const bytes = await chosenFile('evidence-file', 2 * 1024 * 1024);
@@ -245,9 +290,10 @@ for (const [id, name, field, type] of [
 });
 byId('save-summary').addEventListener('click', () => {
   if (!loadedTask) return;
-  const summary = makeSummary(loadedTask, { simulation: currentMode === 'demo', verification: evidenceVerification, scenario: currentMode === 'demo' ? currentDemo?.key : null });
-  summary.observation = { observedAt: currentMode === 'live' ? observedAt : null, creationTransaction: creationObservation?.transactionHash ?? null,
-    creationReceiptChecked: Boolean(creationObservation), creationBlock: creationObservation?.blockNumber ?? null };
+  const summary = makeSummary(loadedTask, { simulation: currentMode === 'demo', verification: evidenceVerification,
+    scenario: currentMode === 'demo' ? currentDemo?.key : null,
+    evidenceChecks: evidenceSourceChecks,
+    observation: { observedAt, creation: creationObservation, readPathLatencyMs: liveReadPathLatencyMs } });
   download('summary.json', JSON.stringify(summary, null, 2) + '\n');
 });
 function guideTimeline() {

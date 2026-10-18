@@ -155,3 +155,18 @@ These commands are available; listing them is not a claim that they ran or passe
 Browser checks require Chrome/Chromium; set `AGENTLEDGER_CHROME_PATH` if needed. Anvil checks also require Foundry. Pocket has its own `test:browser:live` command that writes a read-only observation under `out/pocket-live-testnet/` using exclusive creation. Preserve prior evidence before handling that output directory for a rerun.
 
 See the [CI workflow](.github/workflows/ci.yml); actual execution depends on the run for the specific commit. Public Testnet payment acceptance requirements are documented [separately](docs/live-testnet-observation.md).
+
+## Judge navigation and honest results
+
+| What to check | Where to go | Scope of the result |
+| --- | --- | --- |
+| Task, recorder claim, evidence, tampering, lost ACK | `/demo` → Honest Results | **LOCAL / SIMULATED ONLY**; local hashing is real, public payment is not |
+| Task identity and original creation transaction | `/studio` → Testnet lookup | **TESTNET / READ ONLY**; receipt rechecked on each request |
+| Exact input/output and canonical evidence digest | `/studio` → Evidence lab | Byte match is not correct execution or payment finality |
+| Manually approved native test-MON transaction | `/mon` | Separate wallet-signed experiment, not USDC/x402 acceptance |
+
+**Honest Results** presents Claim / Checked by / State without flattening unknowns into success. `PaymentUnknown`, `NOT_VERIFIED` and `TAMPER_REJECTED` remain explicit. Lost ACK cannot authorize an automatic retry: **NO RECHARGE** until the original transfer is reconciled.
+
+In exported `summary.json`, `metrics.readPathLatencyMs` measures browser → service → RPC round-trip, **not server-side RPC latency or block confirmation**. Creation block number and hash are populated only when the original receipt and canonical block were checked. The read-only Studio does not independently verify payment and Evidence anchor receipts, so `paymentToEvidenceBlockSpan` and `writeGasUsedWei` are `null`. Simulations must leave all real-chain measurement fields `null`; no Monad parallel throughput metric is invented.
+
+**Why anchor on-chain?** The task state and evidence digest become publicly queryable references, not an oracle of execution correctness. **Does Proven establish correct execution?** No: it is an authorized digest submission. **Can we claim real USDC payment acceptance?** No; the reviewed deployment registry is empty and `BLOCKED_NO_REVIEWED_DEPLOYMENT` remains the public boundary.

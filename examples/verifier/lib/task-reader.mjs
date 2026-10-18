@@ -64,16 +64,21 @@ export function normalizeTask(taskId, contract, task) {
 }
 
 // Injectable client enables hermetic tests without contacting a real RPC.
-export async function readTask(client, contract, taskId) {
+export async function readTask(client, contract, taskId, {blockNumber} = {}) {
   const input = validateLookup(contract, taskId);
+  if (blockNumber !== undefined) check(typeof blockNumber === "bigint" && blockNumber >= 0n, "invalid block number");
   check(await client.getChainId() === CHAIN_ID, "RPC connected to wrong chain (expected 10143)");
-  const code = await client.getBytecode({ address: input.contract });
+  // For a dual-source witness, bytecode and task must be read at the same
+  // exact block height; an implicit latest lookup would be a TOCTOU race.
+  const atBlock = blockNumber === undefined ? {} : {blockNumber};
+  const code = await client.getBytecode({ address: input.contract, ...atBlock });
   check(typeof code === "string" && code !== "0x" && code.length > 2, "no contract bytecode at address");
   const task = await client.readContract({
     address: input.contract,
     abi: TASK_ABI,
     functionName: "getTask",
     args: [input.taskId],
+    ...atBlock,
   });
   return normalizeTask(input.taskId, input.contract, task);
 }
