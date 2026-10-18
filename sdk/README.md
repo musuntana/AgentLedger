@@ -36,7 +36,9 @@ const matched=await sdk.verify(ledgerContract,taskId,evidenceJson,{
   inputBytes: originalInputUint8Array,
   outputBytes: originalOutputUint8Array
 });
-// matched.match === true only if canonical bytes match the anchor.
+// matched.match and matched.evidenceDigestMatched mean canonical Evidence
+// JSON matches its chain anchor; optional original files are separate.
+// matched.originalFilesCoverage: NOT_SUPPLIED / PARTIAL_MATCHED / BOTH_MATCHED
 // matched.paymentVerified === false and matched.chargeAgain === false
 
 const receipt=await sdk.reconcile({
@@ -62,6 +64,11 @@ const receipt=await sdk.reconcile({
 - `verify` accepts only `inputBytes` and `outputBytes` options,
   each an ArrayBuffer or typed-array view. Evidence JSON must match
   the strict `agentledger.evidence.v1` schema and SHA-256 anchor.
+  Malformed Evidence and mismatched task identity are rejected **before**
+  contacting RPC. Original files remain optional; `evidenceDigestMatched`
+  and `originalFilesCoverage` tell consumers exactly what was checked.
+- SDK result objects, including nested task and status observations, are
+  frozen snapshots. Consumers must re-observe rather than mutating a result.
 - `reconcile` validates the exact descriptor schema **before** any
   RPC request: chain/network, task ID, transaction, payer, payTo,
   official Monad Testnet USDC token, positive decimal atomic amount,
