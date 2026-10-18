@@ -134,7 +134,15 @@ All SDK errors have:
 `name="AgentLedgerSDKError"`, a stable `code` and `operation`,
 `retryable` for **read-only observation only**, plus
 `paymentStatus="PaymentUnknown"` and `chargeAgain=false`.
-Errors do not expose RPC URLs, wallet payloads or approval signatures.
+Sanitized `rpcStage` (`NONE / HEAD / BLOCK_HEADER / HISTORICAL_STATE /
+CONTRACT_STATE / RECEIPT`) and `rpcRole` (`NONE / PRIMARY / WITNESS`)
+identify the failing read-only step. They never reveal RPC URLs, wallet
+payloads, approval signatures, raw JSON-RPC errors or provider credentials.
+Historical state pruning and unsupported history methods have their own
+non-retryable diagnostic rather than being presented as transient RPC loss.
+The SDK's read-only viem transport uses a fixed 10-second timeout and no
+automatic transport retries; the settlement verifier manages its own
+bounded requests.
 
 | Code | Meaning | Retryable read-only operation? |
 |---|---|---|
@@ -145,6 +153,7 @@ Errors do not expose RPC URLs, wallet payloads or approval signatures.
 | `SDK_CHAIN_MISMATCH`, `SDK_TASK_UNAVAILABLE` | Wrong chain or unavailable contract task | No |
 | `SDK_SETTLEMENT_INCONSISTENT` | Conflicting or malformed Transfer/nonce/receipt/canonical chain facts | No |
 | `SDK_WITNESS_CONFLICT` | Distinct RPC URLs disagree on task or settlement chain facts | No |
+| `SDK_HISTORICAL_STATE_UNAVAILABLE` | Required RPC history pruned or method unsupported; switch to a history-capable node | No |
 | `SDK_SETTLEMENT_PENDING` | Original transaction receipt missing or confirmation threshold not yet met | Yes, **read-only reconciliation only** |
 | `SDK_OBSERVATION_UNAVAILABLE` | RPC timeout/outage or ambiguous observation | Yes, **read-only only** |
 
