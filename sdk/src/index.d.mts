@@ -62,7 +62,11 @@ export interface VerifyResult extends ReadonlyBoundary {
   readonly source:"CHAIN_ANCHOR_PLUS_LOCAL_BYTES";
   readonly match:true;readonly digest:string;
   readonly evidenceHash:string;
+  /** Canonical Evidence JSON digest matched the Ledger anchor. */
+  readonly evidenceDigestMatched:true;
+  /** Original files are optional and independently checked only if supplied. */
   readonly inputChecked:boolean;readonly outputChecked:boolean;
+  readonly originalFilesCoverage:"NOT_SUPPLIED"|"PARTIAL_MATCHED"|"BOTH_MATCHED";
   readonly paymentStatus:"PaymentUnknown";
   readonly paymentVerified:false;
 }
