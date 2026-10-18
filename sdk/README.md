@@ -67,6 +67,10 @@ const receipt=await sdk.reconcile({
   Malformed Evidence and mismatched task identity are rejected **before**
   contacting RPC. Original files remain optional; `evidenceDigestMatched`
   and `originalFilesCoverage` tell consumers exactly what was checked.
+  Both canonical Evidence and original byte views are copied **before the
+  first awaited RPC call** (preventing caller-side mutation races).
+  Each optional original byte buffer is limited to 10 MiB; oversized
+  inputs fail locally without initiating a query.
 - SDK result objects, including nested task and status observations, are
   frozen snapshots. Consumers must re-observe rather than mutating a result.
 - `reconcile` validates the exact descriptor schema **before** any
@@ -74,7 +78,9 @@ const receipt=await sdk.reconcile({
   official Monad Testnet USDC token, positive decimal atomic amount,
   mandatory EIP-3009 nonce and bounded integer confirmation policy
   (1–1000). No arbitrary transport or per-call RPC override is
-  forwarded to the chain verifier. Read-only receipt observation is
+  forwarded to the chain verifier. The accepted receipt descriptor is
+  snapshotted before RPC to prevent asynchronous caller mutation.
+  Read-only receipt observation is
   intentionally weaker than the separate signed-intent + precharge
   Phase 0 CLI reconciliation.
 
@@ -93,7 +99,8 @@ Errors do not expose RPC URLs, wallet payloads or approval signatures.
 | `SDK_INVALID_INPUT` | Invalid task, receipt, nonce or confirmation descriptor | No |
 | `SDK_INVALID_EVIDENCE`, `SDK_EVIDENCE_MISMATCH` | Bad canonical format or digest conflict | No |
 | `SDK_CHAIN_MISMATCH`, `SDK_TASK_UNAVAILABLE` | Wrong chain or unavailable contract task | No |
-| `SDK_SETTLEMENT_INCONSISTENT` | Conflicting Transfer/nonce/receipt/canonical chain facts | No |
+| `SDK_SETTLEMENT_INCONSISTENT` | Conflicting or malformed Transfer/nonce/receipt/canonical chain facts | No |
+| `SDK_SETTLEMENT_PENDING` | Original transaction receipt missing or confirmation threshold not yet met | Yes, **read-only reconciliation only** |
 | `SDK_OBSERVATION_UNAVAILABLE` | RPC timeout/outage or ambiguous observation | Yes, **read-only only** |
 
 A `retryable` error **never** licenses another charge, nonce reuse,
