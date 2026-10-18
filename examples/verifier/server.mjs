@@ -16,6 +16,7 @@ const STATIC = new Map([
   ["/locale-copy.mjs", ["./public/locale-copy.mjs", "text/javascript; charset=utf-8"]],
   ["/demo-scenarios.mjs", ["./public/demo-scenarios.mjs", "text/javascript; charset=utf-8"]],
   ["/summary.mjs", ["./public/summary.mjs", "text/javascript; charset=utf-8"]],
+  ["/verdict-matrix.mjs", ["./public/verdict-matrix.mjs", "text/javascript; charset=utf-8"]],
   ["/experience.css", ["./public/experience.css", "text/css; charset=utf-8"]],
   ["/style.css", ["./public/style.css", "text/css; charset=utf-8"]],
   ["/evidence-browser.mjs", ["./public/evidence-browser.mjs", "text/javascript; charset=utf-8"]],

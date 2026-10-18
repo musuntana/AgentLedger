@@ -111,6 +111,30 @@ jobs:
           test -s judge.md
           test -s judge.en.md
 
+
+  cloudflare-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            slides/package-lock.json
+            apps/pocket/package-lock.json
+      - name: Install workspace dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Wrangler deploy builds missing assets and bundles Worker (no upload)
+        run: npx wrangler deploy --dry-run --outdir out/cloudflare/dry-run
+      - name: Check Studio, Pocket and bilingual Pitch assets
+        run: |
+          node -e "const fs=require('node:fs'); const p='out/cloudflare/public/'; for(const f of ['studio.html','workbench.html','verdict-matrix.mjs','pocket/index.html','pitch/index.html','pitch/en/index.html']) {if(!fs.existsSync(p+f)) throw Error('missing asset: '+f)}"
+      - name: Repeat dry-run with complete assets (no duplicate build)
+        run: npx wrangler deploy --dry-run --outdir out/cloudflare/dry-run-second
+
   forge-anvil:
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -19,7 +19,7 @@ const ROUTES = new Map([
   ['/mon', '/mon/index.html'], ['/mon/', '/mon/index.html'],
   ['/artifact.json', '/artifact.json'], ['/api/showcase', '/showcase.json'],
   ...['app.mjs', 'demo-scenarios.mjs', 'demo-guide.mjs', 'text-stats.mjs',
-    'summary.mjs', 'evidence-browser.mjs', 'locale.mjs', 'locale-copy.mjs',
+    'summary.mjs', 'verdict-matrix.mjs', 'evidence-browser.mjs', 'locale.mjs', 'locale-copy.mjs',
     'style.css', 'experience.css', 'deploy.mjs', 'wallet-connection.mjs',
     'testnet-transactions.mjs', 'deploy.css'].map(name => ['/' + name, '/' + name]),
   ...['app', 'abi', 'sha256', 'mon-evidence', 'pipeline', 'journal']

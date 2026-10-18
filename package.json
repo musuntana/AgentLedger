@@ -27,7 +27,8 @@
     "test:browser:anvil": "python3 examples/verifier/browser/testnet-local-e2e.py",
     "test:browser:live": "python3 examples/verifier/browser/demo-public-read-smoke.py",
     "fmt": "npx --yes prettier --write . 2>/dev/null || true",
-    "build:cloudflare": "node tools/build-cloudflare.mjs"
+    "build:cloudflare": "node tools/build-cloudflare.mjs",
+    "build": "npm run build:cloudflare"
   },
   "devDependencies": {
     "wrangler": "4.151.1"
