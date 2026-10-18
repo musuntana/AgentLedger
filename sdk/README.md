@@ -26,11 +26,14 @@ npm run packcheck
 import {createAgentLedgerVerifier} from "@agentledger/verify";
 
 const sdk=createAgentLedgerVerifier({
-  rpcUrl:"https://testnet-rpc.monad.xyz"
+  rpcUrl:"https://testnet-rpc.monad.xyz",
+  // Optional: provide a different trusted RPC origin to cross-check.
+  // witnessRpcUrl:"https://your-second-monad-rpc.example"
 });
 const observed=await sdk.observe(ledgerContract,taskId);
 // observed.schemaVersion === "agentledger.sdk.read-only.v1"
 // observed.status.state === "PaymentUnknown" (even if recorder says Proven)
+// observed.rpcWitness === "SINGLE_RPC" or "DUAL_RPC_MATCHED"
 
 const matched=await sdk.verify(ledgerContract,taskId,evidenceJson,{
   inputBytes: originalInputUint8Array,
@@ -57,9 +60,31 @@ const receipt=await sdk.reconcile({
 // pre-charge reservation, finality or Agent execution correctness.
 ```
 
+### Optional two-RPC observation
+
+Configure `witnessRpcUrl` at SDK construction to make `observe`,
+`verify`, and `reconcile` require **two** read-only RPC observations.
+Both endpoints must use distinct, HTTPS (or local loopback HTTP) origins.
+A missing, wrong-chain or inconsistent second source **never** falls back
+to single-source success. Divergent task or payment receipt facts raise
+`SDK_WITNESS_CONFLICT` with `retryable:false` and `chargeAgain:false`;
+a temporary source outage or pending receipt permits only another
+read-only observation.
+
+`rpcWitness="DUAL_RPC_MATCHED"` denotes agreement at **two configured
+RPC URLs**, not two independent infrastructure operators. Behind different
+URLs the same node/provider may be used. Neither task observations nor
+receipts are pinned to the same historical block in this alpha, so chain
+progress between reads can cause safe false conflicts. Receipt chain-head
+and confirmation counts are allowed to differ, but the underlying
+transaction, event positions, block hash and nonce must agree. Agreement
+does **not** prove finality, payment intent, task execution, or public
+Testnet acceptance.
+
 ### Input normalization
 
-- The RPC is fixed once at SDK creation. Only HTTPS or loopback HTTP
+- RPC URLs (primary and optional witness) are fixed once at SDK creation.
+  The witness URL must differ from the primary origin. Only HTTPS or loopback HTTP
   is allowed; embedded credentials, arbitrary paths, query strings and
   URL fragments are rejected at construction. No caller-provided
   `client/transport/fetch/request`; those are refused **first**.
@@ -111,6 +136,7 @@ Errors do not expose RPC URLs, wallet payloads or approval signatures.
 | `SDK_INVALID_EVIDENCE`, `SDK_EVIDENCE_MISMATCH` | Bad canonical format or digest conflict | No |
 | `SDK_CHAIN_MISMATCH`, `SDK_TASK_UNAVAILABLE` | Wrong chain or unavailable contract task | No |
 | `SDK_SETTLEMENT_INCONSISTENT` | Conflicting or malformed Transfer/nonce/receipt/canonical chain facts | No |
+| `SDK_WITNESS_CONFLICT` | Distinct RPC URLs disagree on task or settlement chain facts | No |
 | `SDK_SETTLEMENT_PENDING` | Original transaction receipt missing or confirmation threshold not yet met | Yes, **read-only reconciliation only** |
 | `SDK_OBSERVATION_UNAVAILABLE` | RPC timeout/outage or ambiguous observation | Yes, **read-only only** |
 
