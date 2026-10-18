@@ -9,7 +9,7 @@
  * payload is ever appended to a network error message.
  */
 import { readTask, makeClient, CHAIN_ID, RPC, validateLookup } from "../../examples/verifier/lib/task-reader.mjs";
-import { verifyEvidence } from "../../examples/verifier/public/evidence-browser.mjs";
+import { verifyEvidence, canonicalEvidence } from "../../examples/verifier/public/evidence-browser.mjs";
 import { projectPhase0 } from "../../phase0/status.mjs";
 import { verifyLive, NETWORK, USDC_CONTRACT } from "../../tools/settlement.mjs";
 
@@ -37,6 +37,19 @@ function sdkError(code,operation,message,retryable=false) {
 }
 function requireInput(ok,operation,message) {
   if(!ok)throw sdkError("SDK_INVALID_INPUT",operation,message);
+}
+// SDK observations are evidence snapshots, not mutable client-owned state.
+// Restrict this to plain JSON-like response objects (never ArrayBufferViews).
+function freezeSnapshot(value) {
+  if(value && typeof value==="object") {
+    for(const child of Object.values(value)) freezeSnapshot(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+function originalFilesCoverage(inputChecked,outputChecked) {
+  return inputChecked && outputChecked ? "BOTH_MATCHED" :
+    inputChecked || outputChecked ? "PARTIAL_MATCHED" : "NOT_SUPPLIED";
 }
 function safeRpcUrl(value){
   requireInput(typeof value==="string"&&value.length>0&&value.length<=2048,
@@ -127,7 +140,7 @@ export function createAgentLedgerVerifier(options={}) {
       return observeSafely("observe",async()=>{
         validateLookup(contract,taskId);
         const task=await readTask(chain,contract,taskId);
-        return Object.freeze({
+        return freezeSnapshot({
           schemaVersion:SDK_SCHEMA,sdkVersion:SDK_VERSION,source:"RPC_READ_ONLY",
           task,status:projectPhase0({task,attempt:"NotEstablished"}),
           paymentStatus:"PaymentUnknown",paymentVerified:false,
@@ -148,10 +161,19 @@ export function createAgentLedgerVerifier(options={}) {
           requireInput(value===null||value instanceof ArrayBuffer||ArrayBuffer.isView(value),
             "verify",name+" must be raw bytes");
         }
+        // Validate local Evidence BEFORE RPC: malformed inputs must not
+        // contact a node, even when the node is unavailable.
+        canonicalEvidence(evidence);
+        requireInput(typeof evidence.taskId==="string", "verify", "Evidence task ID required");
+        if(evidence.taskId!==taskId.toLowerCase())
+          throw sdkError("SDK_EVIDENCE_MISMATCH","verify","Evidence task ID does not match the requested task");
         const task=await readTask(chain,contract,taskId);
         const matched=await verifyEvidence(evidence,task,inputBytes,outputBytes);
-        return Object.freeze({
-          ...matched,schemaVersion:SDK_SCHEMA,sdkVersion:SDK_VERSION,
+        return freezeSnapshot({
+          ...matched,
+          evidenceDigestMatched:true,
+          originalFilesCoverage:originalFilesCoverage(matched.inputChecked,matched.outputChecked),
+          schemaVersion:SDK_SCHEMA,sdkVersion:SDK_VERSION,
           source:"CHAIN_ANCHOR_PLUS_LOCAL_BYTES",evidenceHash:task.evidenceHash,
           paymentStatus:"PaymentUnknown",paymentVerified:false,
           finalityProven:false,chargeAgain:false,executionAuthority:"ACP",
@@ -163,7 +185,7 @@ export function createAgentLedgerVerifier(options={}) {
       return observeSafely("reconcile",async()=>{
         const validated=verifyReceiptInput(expected,options); // BEFORE any network
         const payment=await verifyLive(expected,rpcUrl,fetch,validated);
-        return Object.freeze({
+        return freezeSnapshot({
           schemaVersion:SDK_SCHEMA,sdkVersion:SDK_VERSION,source:"USDC_RECEIPT_ONLY",
           paymentEventObserved:true,nonce:payment.paymentNonce,
           transaction:payment.transaction,blockHash:payment.blockHash,
