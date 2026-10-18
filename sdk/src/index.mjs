@@ -70,16 +70,18 @@ function snapshotBytes(value,name) {
     throw sdkError("SDK_INVALID_INPUT","verify",name+" has unavailable raw bytes");
   }
 }
-// Copy only fields admitted by the already-validated descriptor schema.
-// A caller may mutate their original object while asynchronous RPC runs.
+// Take one descriptor snapshot before validating it and awaiting RPC.
+// Reject getters, non-enumerable overrides and inherited required fields.
 function snapshotReceipt(expected) {
-  return Object.freeze({
-    network:expected.network,taskId:expected.taskId,
-    transaction:expected.transaction,payer:expected.payer,
-    payTo:expected.payTo,amountAtomic:expected.amountAtomic,
-    paymentNonce:expected.paymentNonce,
-    ...(expected.token===undefined?{}:{token:expected.token}),
-  });
+  const fields=new Set(["network","taskId","transaction","payer","payTo",
+    "token","amountAtomic","paymentNonce"]);
+  const keys=Reflect.ownKeys(expected);
+  requireInput(keys.every(key=>typeof key==="string" && fields.has(key)),
+    "reconcile","Unknown receipt descriptor field");
+  const descriptors=Object.getOwnPropertyDescriptors(expected);
+  requireInput(keys.every(key=>Object.hasOwn(descriptors[key],"value")),
+    "reconcile","Receipt descriptor fields must be plain data");
+  return Object.freeze(Object.fromEntries(keys.map(key=>[key,descriptors[key].value])));
 }
 function safeRpcUrl(value){
   requireInput(typeof value==="string"&&value.length>0&&value.length<=2048,
@@ -127,23 +129,20 @@ function verifyReceiptInput(expected,options){
   const op="reconcile";
   requireInput(expected!==null&&typeof expected==="object"&&!Array.isArray(expected),
     op,"Expected payment receipt descriptor required");
-  // Keep a narrow, versioned input contract rather than forwarding
-  // attacker-controlled objects / transport overrides into the RPC client.
-  const fields=new Set(["network","taskId","transaction","payer","payTo",
-    "token","amountAtomic","paymentNonce"]);
-  requireInput(Object.keys(expected).every(key=>fields.has(key)),
-    op,"Unknown receipt descriptor field");
-  requireInput(expected.network===NETWORK,op,"Expected network must be eip155:10143");
-  requireInput(NONCE.test(expected.paymentNonce||""),op,
+  // Only own primitive data fields reach the settlement verifier.
+  // Validate the exact same immutable descriptor used by the RPC operation.
+  const descriptor=snapshotReceipt(expected);
+  requireInput(descriptor.network===NETWORK,op,"Expected network must be eip155:10143");
+  requireInput(NONCE.test(descriptor.paymentNonce||""),op,
     "EIP-3009 paymentNonce required; PaymentUnknown, do not recharge");
-  requireInput(NONCE.test(expected.taskId||"")&&NONCE.test(expected.transaction||""),
+  requireInput(NONCE.test(descriptor.taskId||"")&&NONCE.test(descriptor.transaction||""),
     op,"Expected bytes32 task ID and transaction hash");
-  requireInput(ADDRESS.test(expected.payer||"")&&ADDRESS.test(expected.payTo||""),
+  requireInput(ADDRESS.test(descriptor.payer||"")&&ADDRESS.test(descriptor.payTo||""),
     op,"Expected valid payer and payTo addresses");
-  requireInput(expected.token===undefined ||
-    (ADDRESS.test(expected.token||"")&&expected.token.toLowerCase()===USDC_CONTRACT.toLowerCase()),
+  requireInput(descriptor.token===undefined ||
+    (ADDRESS.test(descriptor.token||"")&&descriptor.token.toLowerCase()===USDC_CONTRACT.toLowerCase()),
     op,"Only official Monad Testnet USDC is supported");
-  requireInput(typeof expected.amountAtomic==="string"&&DECIMAL.test(expected.amountAtomic),
+  requireInput(typeof descriptor.amountAtomic==="string"&&DECIMAL.test(descriptor.amountAtomic),
     op,"Expected positive decimal amountAtomic");
   requireInput(options!==null&&typeof options==="object"&&!Array.isArray(options),
     op,"Receipt observation options must be an object");
@@ -152,7 +151,7 @@ function verifyReceiptInput(expected,options){
   const minConfirmations=options.minConfirmations??2;
   requireInput(Number.isInteger(minConfirmations)&&minConfirmations>=1&&
     minConfirmations<=1000,op,"Invalid confirmation policy (1..1000)");
-  return {minConfirmations};
+  return {minConfirmations,descriptor};
 }
 /**
  * Create a read-only verifier. Caller-provided clients, fetch, transports,
@@ -218,9 +217,8 @@ export function createAgentLedgerVerifier(options={}) {
     },
     async reconcile(expected,options={}){
       return observeSafely("reconcile",async()=>{
-        const validated=verifyReceiptInput(expected,options); // BEFORE any network
-        const expectedSnapshot=snapshotReceipt(expected);
-        const payment=await verifyLive(expectedSnapshot,rpcUrl,fetch,validated);
+        const {descriptor,minConfirmations}=verifyReceiptInput(expected,options); // BEFORE any network
+        const payment=await verifyLive(descriptor,rpcUrl,fetch,{minConfirmations});
         return freezeSnapshot({
           schemaVersion:SDK_SCHEMA,sdkVersion:SDK_VERSION,source:"USDC_RECEIPT_ONLY",
           paymentEventObserved:true,nonce:payment.paymentNonce,
