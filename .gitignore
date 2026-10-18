@@ -19,3 +19,7 @@ slides/dist/
 .wrangler/
 .dev.vars
 .dev.vars.*
+
+# Explicit development observation inputs and reports
+/dev-request.json
+/dev-observation.json

@@ -13,6 +13,8 @@
   "description": "AgentLedger - Pay → Execute → Prove (Monad testnet experiment)",
   "scripts": {
     "dev": "node tools/dev.mjs",
+    "wallet:dev": "node tools/testnet-dev-wallet.mjs",
+    "dev:observe": "node examples/verifier/tools/dev-observe.mjs",
     "start": "npm --prefix examples/verifier start",
     "deploy:testnet": "npm --prefix examples/verifier run deploy:testnet",
     "test": "npm run test:node && npm run test:sdk && npm run test:python",
@@ -27,8 +29,7 @@
     "test:browser:anvil": "python3 examples/verifier/browser/testnet-local-e2e.py",
     "test:browser:live": "python3 examples/verifier/browser/demo-public-read-smoke.py",
     "fmt": "npx --yes prettier --write . 2>/dev/null || true",
-    "build:cloudflare": "node tools/build-cloudflare.mjs",
-    "build": "npm run build:cloudflare"
+    "build:cloudflare": "node tools/build-cloudflare.mjs"
   },
   "devDependencies": {
     "wrangler": "4.151.1"
