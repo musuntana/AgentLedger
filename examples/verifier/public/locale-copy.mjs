@@ -549,6 +549,8 @@ export const COPY = [
   ["Independent finality verification","独立最终性核验"],
   ["Execution correctness","执行正确性"],
   ["Independent execution evidence","独立执行证据"],
+  ["Original input/output","原始输入与输出"],
+  ["SHA-256 vs Evidence file digests","SHA-256 与 Evidence 内文件摘要比对"],
   ["NOT RUN · no selected task","尚未运行 · 未选择任务"],
   ["LOCAL SIMULATION ONLY · no public payment accepted","仅本地模拟 · 未验收公共链支付"],
   ["EXPECTED REJECTION · local tampering detected; no real payment","预期拒绝 · 本地检测到篡改；无真实付款"],
