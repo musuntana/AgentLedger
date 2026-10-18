@@ -34,7 +34,8 @@ const payload={
 };
 async function localRpc(t,{chainId="0x279f",status=3,evidence=payload,
   onRequest=()=>{},headBlock="0x65",blockHash="0x"+"ab".repeat(32),
-  blockHashes=null,statusAtBlock=null,missingHistorical=false}={}){
+  blockHashes=null,statusAtBlock=null,missingHistorical=false,
+  rpcErrors={}}={}){
   const digest="0x"+createHash("sha256").update(JSON.stringify(evidence)).digest("hex");
   const task={
     creator:CONTRACT,payer:CONTRACT,amount:1000n,maxBudget:2000n,
@@ -69,7 +70,10 @@ async function localRpc(t,{chainId="0x279f",status=3,evidence=payload,
         const results={eth_chainId:chainId,eth_getCode:"0x6001",eth_blockNumber:headBlock};
         result=results[parsed.method]??null;
       }
-      const body=JSON.stringify({jsonrpc:"2.0",id:parsed.id,result});
+      const fault=rpcErrors[parsed.method];
+      const body=JSON.stringify(fault
+        ?{jsonrpc:"2.0",id:parsed.id,error:fault}
+        :{jsonrpc:"2.0",id:parsed.id,result});
       res.writeHead(200,{"content-type":"application/json"});res.end(body);
     }catch(error){res.writeHead(500);res.end();}
   });
@@ -466,4 +470,58 @@ test("unavailable historical block refuses dual witness without implicit latest 
   await assert.rejects(()=>sdk.observe(CONTRACT,ID),e=>
     e.code==="SDK_OBSERVATION_UNAVAILABLE"&&e.retryable===true&&e.chargeAgain===false);
   assert.equal(a.calls.includes("eth_call"),false);
+});
+
+test("pruned historical state has stable non-retryable source diagnosis and no secret echo",async t=>{
+  const first=await localRpc(t);
+  const second=await localRpc(t,{rpcErrors:{
+    eth_call:{code:-32000,message:"missing trie node; credentials=SECRET_DO_NOT_ECHO"}
+  }});
+  const sdk=createAgentLedgerVerifier({rpcUrl:first.url,witnessRpcUrl:second.url});
+  await assert.rejects(()=>sdk.observe(CONTRACT,ID),e=>{
+    assert.equal(e.code,"SDK_HISTORICAL_STATE_UNAVAILABLE");
+    assert.equal(e.operation,"observe");
+    assert.equal(e.rpcStage,"HISTORICAL_STATE");
+    assert.equal(e.rpcRole,"WITNESS");
+    assert.equal(e.retryable,false);
+    assert.equal(e.paymentStatus,"PaymentUnknown");
+    assert.equal(e.chargeAgain,false);
+    assert.equal(e.message.includes("SECRET_DO_NOT_ECHO"),false);
+    return true;
+  });
+  assert.ok(second.calls.includes("eth_call"));
+});
+
+test("unsupported historical header RPC method is typed without a raw node response",async t=>{
+  const first=await localRpc(t);
+  const second=await localRpc(t,{rpcErrors:{
+    eth_getBlockByNumber:{code:-32601,message:"Method not found /tenant/SECRET_PATH"}
+  }});
+  const sdk=createAgentLedgerVerifier({rpcUrl:first.url,witnessRpcUrl:second.url});
+  await assert.rejects(()=>sdk.verify(CONTRACT,ID,payload),e=>{
+    assert.equal(e.code,"SDK_HISTORICAL_STATE_UNAVAILABLE");
+    assert.equal(e.operation,"verify");
+    assert.equal(e.rpcStage,"BLOCK_HEADER");
+    assert.equal(e.rpcRole,"WITNESS");
+    assert.equal(e.retryable,false);
+    assert.equal(e.message.includes("SECRET_PATH"),false);
+    return true;
+  });
+  assert.equal(second.calls.includes("eth_call"),false);
+});
+
+test("temporary unavailable witness reports its stage but remains read-only retryable",async t=>{
+  const first=await localRpc(t);
+  const sdk=createAgentLedgerVerifier({
+    rpcUrl:first.url,witnessRpcUrl:"http://127.0.0.1:1"
+  });
+  await assert.rejects(()=>sdk.observe(CONTRACT,ID),e=>{
+    assert.equal(e.code,"SDK_OBSERVATION_UNAVAILABLE");
+    assert.equal(e.rpcStage,"HEAD");
+    assert.equal(e.rpcRole,"WITNESS");
+    assert.equal(e.retryable,true);
+    assert.equal(e.paymentStatus,"PaymentUnknown");
+    assert.equal(e.chargeAgain,false);
+    return true;
+  });
 });
