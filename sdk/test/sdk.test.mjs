@@ -32,8 +32,8 @@ const payload={
   modelOrTool:"bounded-statistics",outputSha256:"0x"+"44".repeat(32),
   schemaVersion:"agentledger.evidence.v1",taskId:ID,
 };
-async function localRpc(t,{chainId="0x279f",status=3}={}){
-  const digest="0x"+createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+async function localRpc(t,{chainId="0x279f",status=3,evidence=payload}={}){
+  const digest="0x"+createHash("sha256").update(JSON.stringify(evidence)).digest("hex");
   const task={
     creator:CONTRACT,payer:CONTRACT,amount:1000n,maxBudget:2000n,
     descriptionHash:"0x"+"22".repeat(32),evidenceHash:digest,
@@ -220,4 +220,70 @@ test("network unavailability reports retryable READ-ONLY observation only",async
     e=>e.code==="SDK_OBSERVATION_UNAVAILABLE"&&e.retryable===true&&
       e.paymentStatus==="PaymentUnknown"&&e.chargeAgain===false&&
       !String(e.message).includes("127.0.0.1"));
+});
+
+test("observe returns deeply immutable payment and evidence snapshots",async t=>{
+  const rpc=await localRpc(t);
+  const sdk=createAgentLedgerVerifier({rpcUrl:rpc.url});
+  const result=await sdk.observe(CONTRACT,ID);
+  assert.ok(Object.isFrozen(result));
+  assert.ok(Object.isFrozen(result.task));
+  assert.ok(Object.isFrozen(result.status));
+  assert.ok(Object.isFrozen(result.status.payment));
+  assert.ok(Object.isFrozen(result.status.evidence));
+  assert.ok(Object.isFrozen(result.status.retryPolicy));
+  assert.throws(()=>{result.task.status="Paid";},TypeError);
+  assert.throws(()=>{result.status.payment.eventIndependentlyChecked=true;},TypeError);
+  assert.throws(()=>{result.status.retryPolicy.chargeAgain=true;},TypeError);
+  assert.equal(result.status.state,"PaymentUnknown");
+  assert.equal(result.status.retryPolicy.chargeAgain,false);
+});
+
+test("invalid Evidence and task identity are rejected before any RPC request",async t=>{
+  const rpc=await localRpc(t);
+  const sdk=createAgentLedgerVerifier({rpcUrl:rpc.url});
+  for(const [evidence,code] of [
+    [{...payload,schemaVersion:"untrusted"}, "SDK_INVALID_EVIDENCE"],
+    [{...payload,executor:""}, "SDK_INVALID_EVIDENCE"],
+    [{...payload,taskId:"0x"+"88".repeat(32)}, "SDK_EVIDENCE_MISMATCH"],
+  ]){
+    const before=rpc.calls.length;
+    await assert.rejects(()=>sdk.verify(CONTRACT,ID,evidence),e=>{
+      assert.equal(e.code,code);
+      assert.equal(e.operation,"verify");
+      assert.equal(e.paymentStatus,"PaymentUnknown");
+      assert.equal(e.chargeAgain,false);
+      return true;
+    });
+    assert.equal(rpc.calls.length,before);
+  }
+});
+
+test("canonical Evidence match is separate from original-file coverage",async t=>{
+  const input=new TextEncoder().encode("an exact input");
+  const output=new TextEncoder().encode("an exact output");
+  const digest=bytes=>"0x"+createHash("sha256").update(bytes).digest("hex");
+  // Canonical field ordering matches the SDK's strict evidence serializer.
+  const evidence={...payload,inputSha256:digest(input),outputSha256:digest(output)};
+  const rpc=await localRpc(t,{evidence});
+  const sdk=createAgentLedgerVerifier({rpcUrl:rpc.url});
+  const onlyDigest=await sdk.verify(CONTRACT,ID,evidence);
+  assert.equal(onlyDigest.evidenceDigestMatched,true);
+  assert.equal(onlyDigest.match,true);
+  assert.equal(onlyDigest.originalFilesCoverage,"NOT_SUPPLIED");
+  assert.equal(onlyDigest.inputChecked,false);
+  assert.equal(onlyDigest.outputChecked,false);
+  assert.ok(Object.isFrozen(onlyDigest));
+  const inputOnly=await sdk.verify(CONTRACT,ID,evidence,{inputBytes:input});
+  assert.equal(inputOnly.originalFilesCoverage,"PARTIAL_MATCHED");
+  assert.equal(inputOnly.inputChecked,true);
+  assert.equal(inputOnly.outputChecked,false);
+  const complete=await sdk.verify(CONTRACT,ID,evidence,{inputBytes:input,outputBytes:output});
+  assert.equal(complete.originalFilesCoverage,"BOTH_MATCHED");
+  assert.equal(complete.inputChecked,true);
+  assert.equal(complete.outputChecked,true);
+  assert.equal(complete.paymentStatus,"PaymentUnknown");
+  assert.equal(complete.chargeAgain,false);
+  await assert.rejects(()=>sdk.verify(CONTRACT,ID,evidence,{inputBytes:input,outputBytes:new Uint8Array([0])}),
+    e=>e.code==="SDK_EVIDENCE_MISMATCH"&&e.chargeAgain===false);
 });
