@@ -18,7 +18,7 @@ const copies = [
   ['examples/verifier/tools/mon/index.html', 'mon/index.html'],
   ['phase0/demo-showcase.json', 'showcase.json'],
   ...['app.mjs', 'demo-scenarios.mjs', 'demo-guide.mjs', 'text-stats.mjs',
-    'summary.mjs', 'evidence-browser.mjs', 'locale.mjs', 'locale-copy.mjs',
+    'summary.mjs', 'verdict-matrix.mjs', 'evidence-browser.mjs', 'locale.mjs', 'locale-copy.mjs',
     'style.css', 'experience.css'].map(name => ['examples/verifier/public/' + name, name]),
   ...['deploy.mjs', 'wallet-connection.mjs', 'testnet-transactions.mjs', 'deploy.css']
     .map(name => ['examples/verifier/tools/' + name, name]),

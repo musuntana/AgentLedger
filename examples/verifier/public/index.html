@@ -54,6 +54,7 @@
           </div>
         </section>
 
+        <div class="section-head start-here"><div><span class="overline">START HERE</span><h2>What do you want to verify?</h2></div><p class="section-sub">Choose the local demonstration, a real read-only task, or a separately signed wallet experiment.</p></div>
         <nav class="experience-paths studio-paths" aria-label="选择你的体验方式">
           <a class="experience-path primary-path" href="#demo-guide"><span class="path-tag">无需钱包 · 本地模拟</span><strong>先看完整演示</strong><p>三分钟了解任务、支付声明和证据核验。</p></a>
           <a class="experience-path" data-workspace-target="root" href="http://127.0.0.1:4322/"><span class="path-tag">需要钱包 · 创建任务</span><strong>部署并创建链上任务</strong><p>由钱包签名，在测试网上保留第一条记录。</p></a>
@@ -119,6 +120,39 @@
                 <div class="fact-item"><div class="fact-head"><span>Evidence fact</span><span class="fact-source">SHA-256</span></div><strong id="evidence-fact">Not anchored</strong><small id="evidence-detail">Check original bytes to establish digest equality</small></div>
               </div>
               <div class="readonly-warning"><span>ⓘ</span><p><strong>No recharge.</strong> Check the original payment before retrying. Agent execution and recovery are handled separately.</p></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="verification-results" class="studio-section honest-results" aria-labelledby="verdict-title">
+          <div class="section-head"><div><span class="overline">HONEST RESULTS</span><h2 id="verdict-title">What the evidence supports.</h2></div><p id="verdict-source" class="director-source" aria-live="polite">LOCAL / SIMULATED ONLY</p></div>
+          <p class="section-sub verdict-intro">A match can prove byte consistency, not the correctness of an Agent run. A Recorder Paid claim is not an independently settled payment.</p>
+          <div class="results-grid">
+            <section class="panel verdict-panel" aria-label="Verification claim matrix">
+              <h3>Verification matrix</h3>
+              <div class="matrix-scroll"><table class="verdict-table">
+                <thead><tr><th scope="col">Claim</th><th scope="col">Checked by</th><th scope="col">State</th></tr></thead>
+                <tbody id="verification-matrix-body" aria-live="polite"><tr><td>Task identity</td><td>Local fixture</td><td>NOT RUN</td></tr></tbody>
+              </table></div>
+            </section>
+            <section class="panel limits-panel" aria-label="Limitations and measured provenance">
+              <h3>Observed, not assumed</h3>
+              <p id="honest-outcome" class="result-emphasis" role="status">NOT RUN · no selected task</p>
+              <dl class="metric-grid">
+                <div><dt>Read-path latency</dt><dd id="metric-read-latency">NOT MEASURED</dd></div>
+                <div><dt>Creation receipt block</dt><dd id="metric-creation-block">NOT VERIFIED</dd></div>
+                <div><dt>Payment → Evidence block span</dt><dd id="metric-block-span">NOT MEASURED</dd></div>
+                <div><dt>Write gas</dt><dd id="metric-write-gas">NOT ATTRIBUTABLE</dd></div>
+              </dl>
+              <p class="limits-foot">Lost ACK → PaymentUnknown → NO RECHARGE. Null metrics are honest unknowns, not zero values.</p>
+              <div class="recovery-strip" role="note" aria-label="Lost acknowledgment recovery">
+                <h4>Lost response: safe recovery</h4>
+                <ol>
+                  <li><strong>Preserve the original intent</strong><span>Retain the task, payment nonce, and original transaction hash if available.</span></li>
+                  <li><strong>Recheck without spending</strong><span>Read the original transaction and matching chain events; do not send another payment.</span></li>
+                  <li><strong>Hold an uncertain outcome</strong><span>Missing evidence means PaymentUnknown, not failed payment or permission to retry.</span></li>
+                </ol>
+              </div>
             </section>
           </div>
         </section>

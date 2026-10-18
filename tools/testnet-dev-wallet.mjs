@@ -2,15 +2,27 @@
 // SPDX-License-Identifier: Apache-2.0
 // Generate an isolated TESTNET-ONLY key on the operator's own machine.
 // Never prints, uploads, or commits the secret.
-import { mkdirSync, mkdtempSync, writeFileSync, chmodSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, chmodSync, lstatSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 export function createDevWallet({home=homedir(), gen=generatePrivateKey} = {}) {
-  const root=join(home,".config","agentledger","dev-wallets");
-  mkdirSync(root,{recursive:true,mode:0o700});
+  const config=join(home,".config");
+  const agent=join(config,"agentledger");
+  const root=join(agent,"dev-wallets");
+  // Refuse symlinked or foreign-owned wallet storage components. Do not
+  // chmod or write through an attacker-provided redirected path.
+  for(const dir of [config,agent,root]) {
+    try { mkdirSync(dir,{mode:0o700}); }
+    catch(error) { if(error.code!=="EEXIST")throw error; }
+    const st=lstatSync(dir);
+    if(!st.isDirectory() || st.isSymbolicLink() ||
+       (typeof process.getuid==="function" && st.uid!==process.getuid())) {
+      throw Error("Unsafe developer wallet storage path");
+    }
+  }
   chmodSync(root,0o700);
   const folder=mkdtempSync(join(root,"throwaway-"));
   chmodSync(folder,0o700);

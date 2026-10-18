@@ -13,7 +13,7 @@ npm run wallet:dev
 npm run dev
 ```
 
-`wallet:dev` creates a fresh EOA Testnet key in
+`wallet:dev` refuses symlinked or foreign-owned wallet storage folders to avoid redirected writes. It creates a fresh EOA Testnet key in
 `~/.config/agentledger/dev-wallets/throwaway-*/wallet.json` (directory 0700,
 file 0600). Its stdout contains **only** the address and the local path,
 not the private key. Use the address with the official Monad Testnet faucet

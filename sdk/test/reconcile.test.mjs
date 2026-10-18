@@ -17,30 +17,33 @@ const expected={
   network:"eip155:10143",taskId,transaction,payer,payTo,
   token,amountAtomic:"1000",paymentNonce:nonce,
 };
-async function localSettlement(t,{reorg=false,missingAuthorization=false}={}){
+async function localSettlement(t,{reorg=false,missingAuthorization=false,missingReceipt=false,
+  headBlock="0x65",missingLogs=false,onRequest=()=>{},blockHashOverride=null}={}){
+  const observedBlockHash=blockHashOverride??blockHash;
   const logs=[
     {address:token,topics:[transferTopic,topicAddress(payer),topicAddress(payTo)],
       data:"0x"+(1000n).toString(16).padStart(64,"0"),
-      transactionHash:transaction,blockHash,logIndex:"0x0",removed:false},
+      transactionHash:transaction,blockHash:observedBlockHash,logIndex:"0x0",removed:false},
     ...missingAuthorization?[]:[{
       address:token,topics:[authorizationUsed,topicAddress(payer),nonce],
-      data:"0x",transactionHash:transaction,blockHash,logIndex:"0x1",removed:false,
+      data:"0x",transactionHash:transaction,blockHash:observedBlockHash,logIndex:"0x1",removed:false,
     }]
   ];
-  const receipt={transactionHash:transaction,blockHash,blockNumber:"0x64",
-    transactionIndex:"0x1",status:"0x1",logs};
+  const receipt={transactionHash:transaction,blockHash:observedBlockHash,blockNumber:"0x64",
+    transactionIndex:"0x1",status:"0x1",logs:missingLogs?null:logs};
   const calls=[];
   const server=createServer(async(req,res)=>{
     try{
       if(req.method!=="POST"){res.writeHead(405).end();return;}
       let body="";for await(const part of req)body+=part;
       const {method,id}=JSON.parse(body);calls.push(method);
+      onRequest(method);
       const results={
         eth_chainId:"0x279f",
-        eth_getTransactionReceipt:receipt,
-        eth_blockNumber:"0x65",
+        eth_getTransactionReceipt:missingReceipt?null:receipt,
+        eth_blockNumber:headBlock,
         eth_getBlockByNumber:{number:"0x64",
-          hash:reorg?"0x"+"ee".repeat(32):blockHash}
+          hash:reorg?"0x"+"ee".repeat(32):observedBlockHash}
       };
       res.writeHead(200,{"content-type":"application/json"});
       res.end(JSON.stringify({jsonrpc:"2.0",id,result:results[method]??null}));
@@ -60,6 +63,16 @@ test("valid Transfer and consumed nonce remain PaymentUnknown, never a signed ch
   assert.equal(output.nonce,nonce);
   assert.equal(output.transaction,transaction);
   assert.equal(output.chainId,10143);
+  assert.equal(output.blockHash,blockHash);
+  assert.equal(output.blockNumber,"100");
+  assert.equal(output.observedHeadBlockNumber,"101");
+  assert.equal(output.confirmationsAtObservation,"2");
+  assert.equal(output.logIndex,0);
+  assert.equal(output.transactionIndex,1);
+  assert.equal(output.canonicalBlockCheckedAtObservation,true);
+  assert.equal(Object.isFrozen(output),true);
+  // Checked-at-observation never implies chain finality or paid task intent.
+  assert.equal(output.finalityProven,false);
   assert.equal(output.payerIntentVerified,false);
   assert.equal(output.prechargeReservationVerified,false);
   assert.equal(output.finalityProven,false);
@@ -85,4 +98,103 @@ test("reorged canonical block fails closed and cannot produce receipt approval",
   const sdk=createAgentLedgerVerifier({rpcUrl:rpc.url});
   await assert.rejects(()=>sdk.reconcile(expected),e=>
     e.code==="SDK_SETTLEMENT_INCONSISTENT"&&e.operation==="reconcile"&&e.chargeAgain===false);
+});
+
+test("missing receipt and insufficient confirmations remain retryable READ-ONLY pending",async t=>{
+  for(const options of [{missingReceipt:true},{headBlock:"0x64"}]){
+    const rpc=await localSettlement(t,options);
+    const sdk=createAgentLedgerVerifier({rpcUrl:rpc.url});
+    await assert.rejects(()=>sdk.reconcile(expected),error=>{
+      assert.equal(error.name,"AgentLedgerSDKError");
+      assert.equal(error.code,"SDK_SETTLEMENT_PENDING");
+      assert.equal(error.operation,"reconcile");
+      assert.equal(error.retryable,true);
+      assert.equal(error.paymentStatus,"PaymentUnknown");
+      assert.equal(error.chargeAgain,false);
+      return true;
+    });
+    assert.ok(rpc.calls.includes("eth_getTransactionReceipt"));
+  }
+});
+
+test("malformed receipt logs fail closed as inconsistent, not pending/retryable",async t=>{
+  const rpc=await localSettlement(t,{missingLogs:true});
+  const sdk=createAgentLedgerVerifier({rpcUrl:rpc.url});
+  await assert.rejects(()=>sdk.reconcile(expected),error=>{
+    assert.equal(error.code,"SDK_SETTLEMENT_INCONSISTENT");
+    assert.equal(error.retryable,false);
+    assert.equal(error.chargeAgain,false);
+    return true;
+  });
+});
+
+test("reconcile snapshots expected descriptor before asynchronous receipt observation",async t=>{
+  const mutable={...expected};
+  let changed=false;
+  const rpc=await localSettlement(t,{onRequest(method){
+    if(method==="eth_chainId"&&!changed){
+      changed=true;
+      mutable.transaction="0x"+"fa".repeat(32);
+      mutable.paymentNonce="0x"+"ef".repeat(32);
+      mutable.amountAtomic="2";
+    }
+  }});
+  const sdk=createAgentLedgerVerifier({rpcUrl:rpc.url});
+  const result=await sdk.reconcile(mutable);
+  assert.equal(changed,true);
+  assert.equal(result.transaction,transaction);
+  assert.equal(result.nonce,nonce);
+  assert.equal(result.status,"PaymentUnknown");
+  assert.equal(result.chargeAgain,false);
+  assert.equal(Object.isFrozen(result),true);
+});
+
+test("receipt accessors and inherited required fields cannot change validation after snapshot",async t=>{
+  const rpc=await localSettlement(t);
+  const sdk=createAgentLedgerVerifier({rpcUrl:rpc.url});
+  const getter=Object.defineProperty({...expected},"transaction",{
+    enumerable:true,configurable:true,get:()=>transaction,
+  });
+  const inherited=Object.create({transaction});
+  Object.assign(inherited,{...expected});
+  delete inherited.transaction;
+  for(const invalid of [getter,inherited]){
+    await assert.rejects(()=>sdk.reconcile(invalid),error=>
+      error.code==="SDK_INVALID_INPUT"&&error.retryable===false&&error.chargeAgain===false);
+    assert.equal(rpc.calls.length,0);
+  }
+});
+
+test("dual RPC settlement witness checks exact transfer/nonce/receipt facts",async t=>{
+  const first=await localSettlement(t);
+  const second=await localSettlement(t,{headBlock:"0x66"});
+  const sdk=createAgentLedgerVerifier({rpcUrl:first.url,witnessRpcUrl:second.url});
+  const result=await sdk.reconcile(expected);
+  assert.equal(result.rpcWitness,"DUAL_RPC_MATCHED");
+  assert.equal(result.blockHash,blockHash);
+  // Heads/confirmation counts may legitimately differ by RPC snapshot.
+  assert.equal(result.confirmationsAtObservation,"2");
+  assert.equal(result.status,"PaymentUnknown");
+  assert.equal(result.finalityProven,false);
+  assert.equal(result.chargeAgain,false);
+  assert.ok(first.calls.includes("eth_getBlockByNumber"));
+  assert.ok(second.calls.includes("eth_getBlockByNumber"));
+});
+
+test("dual RPC valid-but-conflicting canonical receipt block fails closed",async t=>{
+  const first=await localSettlement(t);
+  const second=await localSettlement(t,{blockHashOverride:"0x"+"ee".repeat(32)});
+  const sdk=createAgentLedgerVerifier({rpcUrl:first.url,witnessRpcUrl:second.url});
+  await assert.rejects(()=>sdk.reconcile(expected),e=>
+    e.code==="SDK_WITNESS_CONFLICT"&&e.operation==="reconcile"&&
+    e.paymentStatus==="PaymentUnknown"&&!e.retryable&&e.chargeAgain===false);
+});
+
+test("pending second receipt cannot be treated as successful first-source payment",async t=>{
+  const first=await localSettlement(t);
+  const second=await localSettlement(t,{missingReceipt:true});
+  const sdk=createAgentLedgerVerifier({rpcUrl:first.url,witnessRpcUrl:second.url});
+  await assert.rejects(()=>sdk.reconcile(expected),e=>
+    e.code==="SDK_SETTLEMENT_PENDING"&&e.retryable===true&&
+    e.paymentStatus==="PaymentUnknown"&&e.chargeAgain===false);
 });

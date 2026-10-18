@@ -2,11 +2,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, existsSync, statSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, existsSync, statSync, readFileSync, rmSync, mkdirSync, symlinkSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { privateKeyToAccount } from "viem/accounts";
 import { runDevObservation } from "../examples/verifier/lib/dev-observation.mjs";
+import { createDevWallet } from "../tools/testnet-dev-wallet.mjs";
 
 const request={schemaVersion:"agentledger.dev-observe.v1",
   chainId:10143,ledger:"0x"+"11".repeat(20),taskId:"0x"+"22".repeat(32),
@@ -57,4 +58,16 @@ test("throwaway wallet CLI writes a private file outside repo and never prints t
     assert.equal(runner.stdout.includes(secret.privateKey),false);
     assert.equal(runner.stderr.includes(secret.privateKey),false);
   } finally { rmSync(home,{recursive:true,force:true}); }
+});
+
+test("throwaway wallet refuses symlinked developer storage instead of writing through it",()=>{
+  const home=mkdtempSync(join(tmpdir(),"agentledger-wallet-symlink-"));
+  try {
+    const outside=join(home,"outside");
+    mkdirSync(join(home,".config"));
+    mkdirSync(outside);
+    symlinkSync(outside,join(home,".config","agentledger"));
+    assert.throws(()=>createDevWallet({home}),/Unsafe developer wallet storage path/);
+    assert.deepEqual(readdirSync(outside),[]);
+  }finally {rmSync(home,{recursive:true,force:true});}
 });
