@@ -62,6 +62,16 @@ test("valid Transfer and consumed nonce remain PaymentUnknown, never a signed ch
   assert.equal(output.nonce,nonce);
   assert.equal(output.transaction,transaction);
   assert.equal(output.chainId,10143);
+  assert.equal(output.blockHash,blockHash);
+  assert.equal(output.blockNumber,"100");
+  assert.equal(output.observedHeadBlockNumber,"101");
+  assert.equal(output.confirmationsAtObservation,"2");
+  assert.equal(output.logIndex,0);
+  assert.equal(output.transactionIndex,1);
+  assert.equal(output.canonicalBlockCheckedAtObservation,true);
+  assert.equal(Object.isFrozen(output),true);
+  // Checked-at-observation never implies chain finality or paid task intent.
+  assert.equal(output.finalityProven,false);
   assert.equal(output.payerIntentVerified,false);
   assert.equal(output.prechargeReservationVerified,false);
   assert.equal(output.finalityProven,false);
