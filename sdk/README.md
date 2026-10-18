@@ -79,7 +79,9 @@ const receipt=await sdk.reconcile({
   mandatory EIP-3009 nonce and bounded integer confirmation policy
   (1–1000). No arbitrary transport or per-call RPC override is
   forwarded to the chain verifier. The accepted receipt descriptor is
-  snapshotted before RPC to prevent asynchronous caller mutation.
+  snapshotted exactly once before validation and RPC to prevent asynchronous
+  caller mutation or getter-driven changes between validation and use.
+  Accessor fields and inherited required fields are rejected.
   Read-only receipt observation is
   intentionally weaker than the separate signed-intent + precharge
   Phase 0 CLI reconciliation.
