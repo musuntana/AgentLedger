@@ -48,6 +48,19 @@ function freezeSnapshot(value) {
   }
   return value;
 }
+// Equal responses from separate endpoints are a consistency witness, not
+// independent provider identity, finality or historical block pinning.
+const TASK_WITNESS_FIELDS=["chainId","contract","taskId","creator","payer","status",
+  "statusValue","amountAtomic","maxBudgetAtomic","descriptionHash","settlementRef",
+  "evidenceHash","createdAt","paidAt","provenAt"];
+const PAYMENT_WITNESS_FIELDS=["taskId","network","token","transaction","payer","payTo",
+  "amountAtomic","paymentNonce","settlementRef","logIndex","transactionIndex",
+  "blockNumber","blockHash"];
+function requireWitnessMatch(primary,secondary,fields,operation) {
+  if(fields.some(field=>primary[field]!==secondary[field]))
+    throw sdkError("SDK_WITNESS_CONFLICT",operation,
+      "RPC endpoints disagree on observed chain facts; PaymentUnknown, do not recharge");
+}
 function originalFilesCoverage(inputChecked,outputChecked) {
   return inputChecked && outputChecked ? "BOTH_MATCHED" :
     inputChecked || outputChecked ? "PARTIAL_MATCHED" : "NOT_SUPPLIED";
@@ -164,10 +177,15 @@ export function createAgentLedgerVerifier(options={}) {
   // Deliberate order: reject injected transport before URL/nonce parsing.
   if(Object.keys(options).some(k=>["client","transport","fetch","request"].includes(k)))
     throw sdkError("SDK_TRANSPORT_FORBIDDEN","create",DENY_TRANSPORT);
-  if(Object.keys(options).some(k=>k!=="rpcUrl"))
+  if(Object.keys(options).some(k=>k!=="rpcUrl"&&k!=="witnessRpcUrl"))
     throw sdkError("SDK_INVALID_OPTIONS","create","Unknown SDK option");
   const rpcUrl=safeRpcUrl(options.rpcUrl??RPC);
+  const witnessRpcUrl=options.witnessRpcUrl===undefined?null:safeRpcUrl(options.witnessRpcUrl);
+  requireInput(witnessRpcUrl===null||witnessRpcUrl!==rpcUrl,"create",
+    "witnessRpcUrl must be a distinct RPC origin");
   const chain=makeClient(rpcUrl);
+  const witnessChain=witnessRpcUrl===null?null:makeClient(witnessRpcUrl);
+  const rpcWitness=witnessChain?"DUAL_RPC_MATCHED":"SINGLE_RPC";
   return Object.freeze({
     sdkVersion:SDK_VERSION,
     capabilities:SDK_CAPABILITIES,
@@ -175,9 +193,13 @@ export function createAgentLedgerVerifier(options={}) {
       return observeSafely("observe",async()=>{
         validateLookup(contract,taskId);
         const task=await readTask(chain,contract,taskId);
+        if(witnessChain) {
+          const second=await readTask(witnessChain,contract,taskId);
+          requireWitnessMatch(task,second,TASK_WITNESS_FIELDS,"observe");
+        }
         return freezeSnapshot({
           schemaVersion:SDK_SCHEMA,sdkVersion:SDK_VERSION,source:"RPC_READ_ONLY",
-          task,status:projectPhase0({task,attempt:"NotEstablished"}),
+          rpcWitness,task,status:projectPhase0({task,attempt:"NotEstablished"}),
           paymentStatus:"PaymentUnknown",paymentVerified:false,
           publicTestnetAcceptance:"BLOCKED_UNLESS_SEPARATELY_REVIEWED",
           finalityProven:false,chargeAgain:false,executionAuthority:"ACP",
@@ -202,13 +224,17 @@ export function createAgentLedgerVerifier(options={}) {
         if(evidenceSnapshot.taskId!==taskId.toLowerCase())
           throw sdkError("SDK_EVIDENCE_MISMATCH","verify","Evidence task ID does not match the requested task");
         const task=await readTask(chain,contract,taskId);
+        if(witnessChain) {
+          const second=await readTask(witnessChain,contract,taskId);
+          requireWitnessMatch(task,second,TASK_WITNESS_FIELDS,"verify");
+        }
         const matched=await verifyEvidence(evidenceSnapshot,task,inputSnapshot,outputSnapshot);
         return freezeSnapshot({
           ...matched,
           evidenceDigestMatched:true,
           originalFilesCoverage:originalFilesCoverage(matched.inputChecked,matched.outputChecked),
           schemaVersion:SDK_SCHEMA,sdkVersion:SDK_VERSION,
-          source:"CHAIN_ANCHOR_PLUS_LOCAL_BYTES",evidenceHash:task.evidenceHash,
+          rpcWitness,source:"CHAIN_ANCHOR_PLUS_LOCAL_BYTES",evidenceHash:task.evidenceHash,
           paymentStatus:"PaymentUnknown",paymentVerified:false,
           finalityProven:false,chargeAgain:false,executionAuthority:"ACP",
           publicTestnetAcceptance:"BLOCKED_UNLESS_SEPARATELY_REVIEWED",
@@ -219,8 +245,13 @@ export function createAgentLedgerVerifier(options={}) {
       return observeSafely("reconcile",async()=>{
         const {descriptor,minConfirmations}=verifyReceiptInput(expected,options); // BEFORE any network
         const payment=await verifyLive(descriptor,rpcUrl,fetch,{minConfirmations});
+        if(witnessRpcUrl) {
+          const second=await verifyLive(descriptor,witnessRpcUrl,fetch,{minConfirmations});
+          requireWitnessMatch(payment,second,PAYMENT_WITNESS_FIELDS,"reconcile");
+        }
         return freezeSnapshot({
           schemaVersion:SDK_SCHEMA,sdkVersion:SDK_VERSION,source:"USDC_RECEIPT_ONLY",
+          rpcWitness,
           paymentEventObserved:true,nonce:payment.paymentNonce,
           transaction:payment.transaction,blockHash:payment.blockHash,
           settlementRef:payment.settlementRef,chainId:CHAIN_ID,
