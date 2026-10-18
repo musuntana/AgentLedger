@@ -49,6 +49,10 @@ const receipt=await sdk.reconcile({
   paymentNonce:eip3009Nonce
 },{minConfirmations:2});
 // receipt.status === "PaymentUnknown" *despite* a valid USDC receipt.
+// receipt.blockNumber / confirmationsAtObservation / logIndex are
+// independently recheckable read-only facts for this point in time.
+// receipt.canonicalBlockCheckedAtObservation === true, but
+// receipt.finalityProven === false, always.
 // Receipt + consumed nonce ≠ independently verified payer intent,
 // pre-charge reservation, finality or Agent execution correctness.
 ```
@@ -73,6 +77,11 @@ const receipt=await sdk.reconcile({
   inputs fail locally without initiating a query.
 - SDK result objects, including nested task and status observations, are
   frozen snapshots. Consumers must re-observe rather than mutating a result.
+- `reconcile` returns the validated receipt's block number, event/transaction
+  position, head height and confirmation count at observation time.
+  `canonicalBlockCheckedAtObservation` records a contemporaneous block-hash
+  comparison. Consumers can independently recheck these facts, but MUST NOT
+  interpret them as stable finality, payer intent, or public acceptance.
 - `reconcile` validates the exact descriptor schema **before** any
   RPC request: chain/network, task ID, transaction, payer, payTo,
   official Monad Testnet USDC token, positive decimal atomic amount,
