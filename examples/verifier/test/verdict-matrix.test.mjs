@@ -45,7 +45,9 @@ test("a confirmed creation receipt does not certify payment or finality", async 
   const matrix = verificationMatrix({ simulation: false, task: fixture.task, verification: "HASH_MATCHED", creation });
   assert.equal(matrix[0].state, "CREATION_RECEIPT_MATCHED");
   assert.equal(matrix[2].state, "HASH_MATCH_NOT_EXECUTION");
-  assert.equal(matrix[3].state, "NOT_VERIFIED");
+  assert.equal(matrix.find(x => x.id === "finality").state, "NOT_VERIFIED");
+  assert.equal(matrix.find(x => x.id === "source-files").state, "SOURCE_BYTES_NOT_SUPPLIED");
+  assert.equal(report.evidence.originalFilesCoverage, "NOT_SUPPLIED");
 });
 
 test("unconfirmed or malformed receipts stay null; tamper is not a successful proof", async () => {
@@ -72,4 +74,31 @@ test("judge-facing verdict labels are bilingual while machine codes stay unchang
   assert.equal(verdictTone("CREATION_RECEIPT_MATCHED"), "verdict-observed");
   assert.equal(verdictTone("SIMULATED_ONLY"), "verdict-limited");
   assert.equal(verdictTone("TASK_STATE_OBSERVED"), "verdict-limited");
+});
+
+test("partial original-file checks cannot masquerade as full coverage", async () => {
+  const fixture = await buildDemoCase("proven");
+  for (const checks of [
+    {inputChecked: true, outputChecked: false},
+    {inputChecked: false, outputChecked: true},
+  ]) {
+    const matrix = verificationMatrix({
+      task: fixture.task, verification: "HASH_MATCHED", ...checks,
+    });
+    assert.equal(matrix.find(row => row.id === "source-files").state, "SOURCE_BYTES_PARTIAL");
+    const summary = makeSummary(fixture.task, {
+      verification: "HASH_MATCHED", evidenceChecks: checks,
+    });
+    assert.equal(summary.evidence.originalFilesCoverage, "PARTIAL_MATCHED");
+    assert.equal(summary.evidence.inputBytesChecked, checks.inputChecked);
+    assert.equal(summary.evidence.outputBytesChecked, checks.outputChecked);
+    assert.equal(summary.payment.observedState, "PaymentUnknown");
+  }
+  const complete = {inputChecked: true, outputChecked: true};
+  assert.equal(verificationMatrix({task:fixture.task,verification:"HASH_MATCHED",...complete})
+    .find(row=>row.id==="source-files").state,"SOURCE_BYTES_MATCHED");
+  assert.equal(makeSummary(fixture.task,{verification:"HASH_MATCHED",evidenceChecks:complete})
+    .evidence.originalFilesCoverage,"BOTH_MATCHED");
+  assert.equal(makeSummary(fixture.task,{verification:"NOT_RUN",evidenceChecks:complete})
+    .evidence.originalFilesCoverage,"NOT_VERIFIED");
 });
