@@ -208,9 +208,11 @@ test("recovery CLI limits approval inputs and never echoes sensitive paths",asyn
   t.after(()=>rmSync(dir,{recursive:true,force:true}));
   const {writeFileSync}=await import("node:fs");
   const large=join(dir,"secret-approved-payload.json");
+  const malformed=join(dir,"malformed-approval.json");
   writeFileSync(large,"x".repeat(2*1024*1024+1));
+  writeFileSync(malformed,'{"private":"SECRET_APPROVAL_CANARY"');
   const cli=new URL("../tools/reconcile-hint.mjs",import.meta.url).pathname;
-  for(const file of [large,join(dir,"SECRET_NONEXISTENT.json")]){
+  for(const file of [large,malformed,join(dir,"SECRET_NONEXISTENT.json")]){
     const result=spawnSync(process.execPath,[cli,file,NONCE,PAYEE],{
       encoding:"utf8",timeout:10000
     });
@@ -219,5 +221,6 @@ test("recovery CLI limits approval inputs and never echoes sensitive paths",asyn
     assert.equal(result.stdout,"");
     assert.equal(result.stderr.includes(file),false);
     assert.equal(result.stderr.includes("SECRET_NONEXISTENT"),false);
+    assert.equal(result.stderr.includes("SECRET_APPROVAL_CANARY"),false);
   }
 });
