@@ -6,7 +6,7 @@ name: agentledger-gates
 
 on:
   push:
-    branches: [dev, main]
+    branches: [dev, main, master]
   pull_request:
   workflow_dispatch:
 
