@@ -17,7 +17,13 @@ async function exercise(contract:string,taskId:string){
     payTo:contract,amountAtomic:"1000",paymentNonce:taskId,
   },{minConfirmations:2});
   const unbound:"PaymentUnknown"=receipt.status;
-  void [unknown,remainsUnknown,unbound];
+  const pointInTime:true=receipt.canonicalBlockCheckedAtObservation;
+  const blockHeight:string=receipt.blockNumber;
+  const confirmations:string=receipt.confirmationsAtObservation;
+  const eventPosition:number=receipt.logIndex;
+  const transactionPosition:number|null=receipt.transactionIndex;
+  const noFinality:false=receipt.finalityProven;
+  void [unknown,remainsUnknown,unbound,pointInTime,blockHeight,confirmations,eventPosition,transactionPosition,noFinality];
 }
 void exercise;
 function classify(e:unknown) {
