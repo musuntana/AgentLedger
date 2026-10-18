@@ -41,7 +41,10 @@ The x402 gate now runs an authorization middleware **before**
 A fail to create the reservation denies settlement. Restarting the
 service preserves the reservation in SQLite (WAL, synchronous FULL).
 The `onAfterSettle` hook also journals an **unverified** transaction
-notice and EIP-3009 nonce for later chain reconciliation.
+notice and EIP-3009 nonce for later chain reconciliation. It now attempts
+an append-only transaction-hint write to the **same** SQLite pre-charge DB
+before writing the standalone notice file. The transaction hint is not a
+signature, verified receipt, finality proof, or permission to recharge.
 
 ## Running the demo gate
 
@@ -104,6 +107,19 @@ cd .
 python3 tools/charge-attempt-journal.py inspect 0xTHE_64_HEX_PAYMENT_NONCE
 ```
 
+The `unverifiedTransactionHint` field (when present) contains the original
+transaction hash and callback source for **read-only** recovery. It does not
+change `RESERVED_RECONCILE_ONLY` or validate chain logs. If no hint was written
+before a crash, recover the hash from the original payer/facilitator response;
+never synthesize a successful transaction or reset the reservation.
+
+The callback-only CLI `attach-hint` accepts a strict JSON object with
+`schemaVersion=agentledger.tx-hint.v1`, `ledger`, `taskId`, `payer`,
+`paymentNonce`, and `transaction` on stdin. It requires an existing identity-
+matched reservation and allows only one immutable hash per nonce. Conflicts
+are rejected and require manual investigation; this is **not** a chain
+verification API.
+
 The post-settlement admission tool requires this exact reserved nonce to
 be consumed in the same USDC transaction's EIP-3009 `AuthorizationUsed`
 event, along with the correct `Transfer` event. Neither event is enough
@@ -128,9 +144,10 @@ defeats the local safety boundary.
 - Signature authorization is EOA only; ERC-1271 wallets, proxies, key
   rotation, audit of a real payer session and independent challenge
   attestation are not implemented.
-- The post-settlement journal is best-effort. After a crash before its
-  write, recovery needs the user's original signed payment data or
-  the verified transaction hash.
+- Both transaction-hint and standalone post-settlement writes are best-effort
+  callbacks. A crash before either write still needs the original signed
+  payment data or transaction hash; neither durable write proves finality.
+  Lost callback metadata never removes the pre-charge reservation.
 - No refund, escrow, finality oracle, automatic `recordPayment`,
   automatically executed Agent task or `submitEvidence` broadcast
   is implemented by this gate.

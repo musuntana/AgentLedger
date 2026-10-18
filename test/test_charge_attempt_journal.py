@@ -84,5 +84,91 @@ class ChargeAttemptTests(unittest.TestCase):
         self.assertEqual(codes.count(3),9,[(p.returncode,p.stdout,p.stderr) for p in outputs])
         self.assertEqual(self.db().execute("SELECT count(*) FROM charge_attempts").fetchone()[0],1)
 
+
+    def hint(self, **updates):
+        payload = {
+            "schemaVersion": "agentledger.tx-hint.v1",
+            "ledger": candidate()["ledger"],
+            "taskId": candidate()["taskId"],
+            "payer": candidate()["payer"],
+            "paymentNonce": candidate()["paymentNonce"],
+            "transaction": "0x" + "88" * 32,
+        }
+        payload.update(updates)
+        return payload
+
+    def test_callback_hint_survives_restart_without_creating_paid_state(self):
+        db = self.db()
+        m.reserve(db, candidate())
+        self.assertIsNone(m.inspect(db, candidate()["paymentNonce"])["unverifiedTransactionHint"])
+        first = m.attach_hint(db, self.hint())
+        self.assertEqual(first["result"], "TX_HINT_STORED_UNVERIFIED")
+        self.assertEqual(first["paymentStatus"], "PaymentUnknown")
+        self.assertFalse(first["chargeAgain"])
+        reopened = self.db()
+        stored = m.inspect(reopened, candidate()["paymentNonce"])
+        self.assertEqual(stored["unverifiedTransactionHint"]["transaction_hash"], self.hint()["transaction"])
+        self.assertEqual(stored["admission"]["status"], "RESERVED_RECONCILE_ONLY")
+        self.assertEqual(m.attach_hint(reopened, self.hint())["result"], "TX_HINT_ALREADY_PRESENT")
+        self.assertEqual(m.reserve(reopened, candidate())["result"], "BLOCKED_EXISTING_ATTEMPT_NO_RECHARGE")
+        self.assertEqual(reopened.execute("SELECT count(*) FROM transaction_hints").fetchone()[0], 1)
+
+    def test_hint_identity_and_transaction_conflicts_fail_closed(self):
+        db = self.db()
+        m.reserve(db, candidate())
+        for patch in [
+            {"ledger": "0x" + "aa" * 20},
+            {"payer": "0x" + "bb" * 20},
+            {"taskId": "0x" + "cc" * 32},
+            {"paymentNonce": "0x" + "dd" * 32},
+            {"transaction": "BAD_HASH"},
+            {"extra": "unexpected"},
+        ]:
+            with self.subTest(patch=patch), self.assertRaises(ValueError):
+                m.attach_hint(db, self.hint(**patch))
+        self.assertIsNone(m.inspect(db, candidate()["paymentNonce"])["unverifiedTransactionHint"])
+        m.attach_hint(db, self.hint())
+        with self.assertRaisesRegex(ValueError, "conflicting transaction hint"):
+            m.attach_hint(db, self.hint(transaction="0x" + "ff" * 32))
+        self.assertEqual(m.inspect(db, candidate()["paymentNonce"])[
+            "unverifiedTransactionHint"]["transaction_hash"], self.hint()["transaction"])
+        self.assertEqual(db.execute("SELECT count(*) FROM transaction_hints").fetchone()[0], 1)
+
+    def test_cli_hint_and_lost_ack_stay_reconcile_only(self):
+        env = os.environ.copy()
+        env["AGENTLEDGER_CHARGE_DB"] = str(self.path)
+        self.assertEqual(m.reserve(self.db(), candidate())["result"], "RESERVED_FIRST_ATTEMPT")
+        cmd = [sys.executable, str(SCRIPT), "attach-hint"]
+        saved = subprocess.run(cmd, input=json.dumps(self.hint()), text=True,
+                               capture_output=True, timeout=10, env=env)
+        self.assertEqual(saved.returncode, 0, saved.stderr)
+        result = json.loads(saved.stdout)
+        self.assertFalse(result["chargeAgain"])
+        self.assertEqual(result["paymentStatus"], "PaymentUnknown")
+        inspected = subprocess.run([sys.executable, str(SCRIPT), "inspect",
+                                    candidate()["paymentNonce"]],
+                                   capture_output=True, text=True, timeout=10, env=env)
+        self.assertEqual(inspected.returncode, 0, inspected.stderr)
+        self.assertEqual(json.loads(inspected.stdout)["unverifiedTransactionHint"][
+            "transaction_hash"], self.hint()["transaction"])
+        self.assertEqual(m.reserve(self.db(), candidate())["result"],
+                         "BLOCKED_EXISTING_ATTEMPT_NO_RECHARGE")
+
+    def test_callback_concurrency_keeps_single_hint(self):
+        self.assertEqual(m.reserve(self.db(), candidate())["result"], "RESERVED_FIRST_ATTEMPT")
+        env = os.environ.copy()
+        env["AGENTLEDGER_CHARGE_DB"] = str(self.path)
+        def attach(_):
+            return subprocess.run([sys.executable, str(SCRIPT), "attach-hint"],
+                                  input=json.dumps(self.hint()), text=True,
+                                  capture_output=True, timeout=10, env=env)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            outputs = list(pool.map(attach, range(8)))
+        self.assertTrue(all(x.returncode == 0 for x in outputs), [x.stderr for x in outputs])
+        labels = [json.loads(x.stdout)["result"] for x in outputs]
+        self.assertEqual(labels.count("TX_HINT_STORED_UNVERIFIED"), 1)
+        self.assertEqual(labels.count("TX_HINT_ALREADY_PRESENT"), 7)
+        self.assertEqual(self.db().execute("SELECT count(*) FROM transaction_hints").fetchone()[0], 1)
+
 if __name__ == "__main__":
     unittest.main()

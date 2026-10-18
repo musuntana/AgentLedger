@@ -17,6 +17,7 @@ import sys
 import time
 
 HEX32 = re.compile(r"^0x[0-9a-f]{64}$")
+TX_HINT_FIELDS = {"schemaVersion", "ledger", "taskId", "payer", "paymentNonce", "transaction"}
 ADDR = re.compile(r"^0x[0-9a-f]{40}$")
 FIELDS = {
     "schemaVersion", "ledger", "taskId", "payer", "approvalNonce",
@@ -36,6 +37,19 @@ CREATE TABLE IF NOT EXISTS charge_attempts (
     UNIQUE(ledger, task_id),
     UNIQUE(ledger, payer, approval_nonce),
     UNIQUE(ledger, quote_digest)
+);
+"""
+# Recovery hints are untrusted callback metadata, never settlement evidence.
+# Kept in a separate table so pre-charge admission stays irreversible.
+HINT_DDL = """
+CREATE TABLE IF NOT EXISTS transaction_hints (
+    payment_nonce TEXT PRIMARY KEY,
+    transaction_hash TEXT NOT NULL,
+    ledger TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    payer TEXT NOT NULL,
+    source TEXT NOT NULL CHECK(source = 'UNVERIFIED_SETTLEMENT_CALLBACK'),
+    recorded_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 """
 
@@ -63,6 +77,7 @@ def connect(db_path):
             db.execute("PRAGMA journal_mode=WAL")
             db.execute("PRAGMA synchronous=FULL")
             db.execute(DDL)
+            db.execute(HINT_DDL)
             return db
         except sqlite3.OperationalError as exc:
             if "locked" not in str(exc).lower() or n == 39:
@@ -107,6 +122,62 @@ def reserve(db, payload):
             db.execute("ROLLBACK")
         raise
 
+
+def validate_hint(payload):
+    if not isinstance(payload, dict) or set(payload) != TX_HINT_FIELDS:
+        raise ValueError("invalid transaction hint shape")
+    if payload["schemaVersion"] != "agentledger.tx-hint.v1":
+        raise ValueError("invalid transaction hint schema")
+    for field in ("paymentNonce", "transaction", "taskId"):
+        if not isinstance(payload[field], str) or not HEX32.fullmatch(payload[field]):
+            raise ValueError("invalid " + field)
+    for field in ("ledger", "payer"):
+        if not isinstance(payload[field], str) or not ADDR.fullmatch(payload[field]):
+            raise ValueError("invalid " + field)
+    return payload
+
+
+def attach_hint(db, payload):
+    """Persist an untrusted transaction pointer without authorizing a charge."""
+    value = validate_hint(payload)
+    db.execute("BEGIN IMMEDIATE")
+    try:
+        reserved = db.execute(
+            "SELECT ledger,task_id,payer,status FROM charge_attempts WHERE payment_nonce=?",
+            (value["paymentNonce"],),
+        ).fetchone()
+        if reserved is None or reserved["status"] != "RESERVED_RECONCILE_ONLY":
+            raise ValueError("no matching precharge reservation")
+        if (reserved["ledger"], reserved["task_id"], reserved["payer"]) != (
+            value["ledger"], value["taskId"], value["payer"]
+        ):
+            raise ValueError("transaction hint identity mismatch")
+        prior = db.execute(
+            "SELECT transaction_hash FROM transaction_hints WHERE payment_nonce=?",
+            (value["paymentNonce"],),
+        ).fetchone()
+        if prior is not None and prior["transaction_hash"] != value["transaction"]:
+            raise ValueError("conflicting transaction hint; manual reconcile only")
+        if prior is None:
+            db.execute(
+                "INSERT INTO transaction_hints "
+                "(payment_nonce,transaction_hash,ledger,task_id,payer,source) "
+                "VALUES (?,?,?,?,?,'UNVERIFIED_SETTLEMENT_CALLBACK')",
+                (value["paymentNonce"], value["transaction"], value["ledger"],
+                 value["taskId"], value["payer"]),
+            )
+        db.execute("COMMIT")
+        return {
+            "result": "TX_HINT_STORED_UNVERIFIED" if prior is None else "TX_HINT_ALREADY_PRESENT",
+            "paymentStatus": "PaymentUnknown", "chargeAgain": False,
+            "transaction": value["transaction"],
+        }
+    except Exception:
+        if db.in_transaction:
+            db.execute("ROLLBACK")
+        raise
+
+
 def inspect(db, payment_nonce):
     if not isinstance(payment_nonce, str) or not HEX32.fullmatch(payment_nonce):
         raise ValueError("invalid payment nonce")
@@ -114,14 +185,23 @@ def inspect(db, payment_nonce):
                      (payment_nonce,)).fetchone()
     if row is None:
         raise ValueError("no precharge reservation exists for this authorization")
-    return {"result": "PRECHARGE_RECORD_FOUND", "admission": dict(row)}
+    hint = db.execute("SELECT * FROM transaction_hints WHERE payment_nonce=?",
+                      (payment_nonce,)).fetchone()
+    return {"result": "PRECHARGE_RECORD_FOUND", "admission": dict(row),
+            "unverifiedTransactionHint": dict(hint) if hint is not None else None,
+            "paymentStatus": "PaymentUnknown", "chargeAgain": False}
 
 def main(args):
-    if args != ["reserve"] and not (len(args) == 2 and args[0] == "inspect"):
-        raise ValueError("usage: charge-attempt-journal.py reserve | inspect PAYMENT_NONCE")
+    if args not in (["reserve"], ["attach-hint"]) and not (len(args) == 2 and args[0] == "inspect"):
+        raise ValueError("usage: charge-attempt-journal.py reserve | attach-hint | inspect PAYMENT_NONCE")
     path = os.environ.get("AGENTLEDGER_CHARGE_DB", "receipts/charge-attempts.db")
     with connect(path) as db:
-        result = reserve(db, json.load(sys.stdin)) if args == ["reserve"] else inspect(db, args[1])
+        if args == ["reserve"]:
+            result = reserve(db, json.load(sys.stdin))
+        elif args == ["attach-hint"]:
+            result = attach_hint(db, json.load(sys.stdin))
+        else:
+            result = inspect(db, args[1])
     print(json.dumps(result, sort_keys=True))
     # Conflict must be an error, otherwise middleware may settle again.
     if args == ["reserve"] and result["result"] != "RESERVED_FIRST_ATTEMPT":
