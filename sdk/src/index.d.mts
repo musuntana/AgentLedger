@@ -87,6 +87,13 @@ export interface ReconcileResult extends ReadonlyBoundary {
   readonly nonce:string;readonly transaction:string;
   readonly blockHash:string;readonly settlementRef:string;
   readonly chainId:10143;
+  /** Recheckable point-in-time chain inclusion, not finality or durable authorization. */
+  readonly blockNumber:string;
+  readonly observedHeadBlockNumber:string;
+  readonly confirmationsAtObservation:string;
+  readonly logIndex:number;
+  readonly transactionIndex:number|null;
+  readonly canonicalBlockCheckedAtObservation:true;
   /** Receipt observation cannot verify signed task intent / reservation. */
   readonly status:"PaymentUnknown";
   readonly payerIntentVerified:false;
