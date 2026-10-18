@@ -224,6 +224,14 @@ export function createAgentLedgerVerifier(options={}) {
           paymentEventObserved:true,nonce:payment.paymentNonce,
           transaction:payment.transaction,blockHash:payment.blockHash,
           settlementRef:payment.settlementRef,chainId:CHAIN_ID,
+          // These are validated receipt/log facts and a point-in-time
+          // canonical block witness, NOT a finality or task-intent proof.
+          blockNumber:payment.blockNumber,
+          observedHeadBlockNumber:payment.observedHeadBlockNumber,
+          confirmationsAtObservation:payment.confirmations,
+          logIndex:payment.logIndex,
+          transactionIndex:payment.transactionIndex,
+          canonicalBlockCheckedAtObservation:payment.canonicalBlockCheckedAtObservation,
           status:"PaymentUnknown",payerIntentVerified:false,
           prechargeReservationVerified:false,finalityProven:false,
           publicTestnetAcceptance:"BLOCKED_UNLESS_SEPARATELY_REVIEWED",
