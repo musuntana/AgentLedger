@@ -21,6 +21,35 @@ No private key is required. If the pre-charge DB has been deleted, is hosted
 by a different service instance, or is unreadable, reconciliation is
 **UNKNOWN**: never silently recreate a reservation to force a success.
 
+## Recovery from a persisted transaction hint
+
+When the settlement callback persisted an **unverified** transaction hash in
+the original SQLite pre-charge journal, the operator no longer needs the
+standalone pending-receipt JSON. The original signed payer approval and
+the EIP-3009 nonce are still required; these are not reconstructed from the
+contract or an arbitrary task URL.
+
+From the repository root:
+
+```bash
+export MONAD_RPC_URL=https://testnet-rpc.monad.xyz
+export AGENTLEDGER_CHARGE_DB="$(pwd)/receipts/charge-attempts.db"
+node examples/verifier/tools/reconcile-hint.mjs \
+  ./approval.json \
+  0xYOUR_ORIGINAL_EIP3009_NONCE \
+  0xYOUR_APPROVED_TESTNET_USDC_RECEIVER
+```
+
+This command opens the existing SQLite DB **read-only**. If the hint is
+missing, the DB is unavailable, the signature/quote disagrees with the
+reservation, or the independent RPC check fails, it exits nonzero with
+`UNKNOWN_NO_RECHARGE`. It never generates a replacement payment, changes
+the reservation or claims failed/unpaid status. A successful read-only
+classification still **does not prove finality** or authorize a Recorder write.
+The stored callback hash is a lookup pointer, not a trusted payment receipt.
+
+For a direct operator-supplied payment notice, use the original workflow below.
+
 ## Command
 
 ```bash
@@ -77,6 +106,14 @@ signature tampering, incorrect payer/amount/settlement reference, wrong
 network, pre-charge nonce/quote mismatch and absent payment nonce.
 They neither contact Monad nor use wallet funds.
 
-**Truthful acceptance:** A full live Testnet payment and
-`recordPayment → run-task → submitEvidence` sequence has not been executed
-by these tests. Keep PR #157 Draft until independently reviewed.
+**Truthful acceptance:** The hermetic tests do not demonstrate a full paid
+Monad Testnet x402 → Recorder → Evidence sequence. A reviewed deployment,
+real-wallet acceptance and explicit finality policy remain separate gates.
+
+### Recovery CLI diagnostic privacy
+
+`reconcile-hint.mjs` reads the local approval JSON with a 2 MiB file bound.
+Failure exits nonzero with a generic `UNKNOWN_NO_RECHARGE` line; it does
+not echo the original signed approval, private filesystem paths, or raw
+provider error messages. Recover the exact original attempt locally and
+never interpret this error as confirmation that the payment failed.

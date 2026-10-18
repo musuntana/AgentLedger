@@ -4,6 +4,7 @@ import concurrent.futures
 import importlib.util
 import json
 import os
+import sqlite3
 from pathlib import Path
 import subprocess
 import sys
@@ -169,6 +170,32 @@ class ChargeAttemptTests(unittest.TestCase):
         self.assertEqual(labels.count("TX_HINT_STORED_UNVERIFIED"), 1)
         self.assertEqual(labels.count("TX_HINT_ALREADY_PRESENT"), 7)
         self.assertEqual(self.db().execute("SELECT count(*) FROM transaction_hints").fetchone()[0], 1)
+
+
+    def test_readonly_inspection_never_creates_missing_db(self):
+        self.assertFalse(self.path.exists())
+        with self.assertRaisesRegex(ValueError, "database unavailable"):
+            m.connect_readonly(self.path)
+        self.assertFalse(self.path.exists())
+
+    def test_readonly_inspection_supports_hint_and_legacy_db(self):
+        db = self.db()
+        m.reserve(db, candidate())
+        nonce = candidate()["paymentNonce"]
+        with m.connect_readonly(self.path) as reader:
+            data = m.inspect(reader, nonce)
+            self.assertIsNone(data["unverifiedTransactionHint"])
+            with self.assertRaises(sqlite3.OperationalError):
+                reader.execute("UPDATE charge_attempts SET status='RESERVED_RECONCILE_ONLY'")
+        # Upgrade/migrate a legacy DB without attaching a hint in read-only mode.
+        db.execute("DROP TABLE transaction_hints")
+        with m.connect_readonly(self.path) as reader:
+            self.assertIsNone(m.inspect(reader, nonce)["unverifiedTransactionHint"])
+        db.execute(m.HINT_DDL)
+        m.attach_hint(db, self.hint())
+        with m.connect_readonly(self.path) as reader:
+            self.assertEqual(m.inspect(reader, nonce)["unverifiedTransactionHint"][
+                "transaction_hash"], self.hint()["transaction"])
 
 if __name__ == "__main__":
     unittest.main()
