@@ -4,7 +4,8 @@
 import { observationMetrics } from './verdict-matrix.mjs';
 export const SUMMARY_SCHEMA="agentledger.demo.summary.v1";
 export const RPC_LABEL="https://testnet-rpc.monad.xyz/"; // identity only, not contacted for simulations
-export function makeSummary(task,{simulation=true,payment=null,verification="NOT_RUN",scenario=null,observation=null}={}) {
+export function makeSummary(task,{simulation=true,payment=null,verification="NOT_RUN",
+  evidenceChecks=null,scenario=null,observation=null}={}) {
   if(!task || typeof task!=="object" || !/^0x[0-9a-fA-F]{64}$/.test(task.taskId||"") ||
     !/^0x[0-9a-fA-F]{64}$/.test(task.descriptionHash||"") ||
     !/^0x[0-9a-fA-F]{40}$/.test(task.contract||"") || task.chainId!==10143) {
@@ -12,6 +13,14 @@ export function makeSummary(task,{simulation=true,payment=null,verification="NOT
   }
   const proof=payment||{};
   const metrics=observationMetrics({simulation,readPathLatencyMs:observation?.readPathLatencyMs,creation:observation?.creation});
+  const evidenceDigestMatched=verification==="HASH_MATCHED";
+  // A matching canonical Evidence JSON never implies original input/output
+  // were supplied; these flags are derived only from the verifier result.
+  const inputBytesChecked=evidenceDigestMatched && evidenceChecks?.inputChecked===true;
+  const outputBytesChecked=evidenceDigestMatched && evidenceChecks?.outputChecked===true;
+  const originalFilesCoverage=!evidenceDigestMatched?"NOT_VERIFIED":
+    inputBytesChecked && outputBytesChecked?"BOTH_MATCHED":
+    inputBytesChecked || outputBytesChecked?"PARTIAL_MATCHED":"NOT_SUPPLIED";
   // Never turn a Recorder claim into independent USDC settlement.
   if(proof.eventIndependentlyChecked===true) {
     throw Error("Studio cannot certify independently checked payment from a simulation or bare task read");
@@ -55,7 +64,8 @@ export function makeSummary(task,{simulation=true,payment=null,verification="NOT
     evidence:{
       evidenceHash:task.evidenceHash,
       verification,
-      bytesIndependentlyChecked:verification==="HASH_MATCHED",
+      bytesIndependentlyChecked:evidenceDigestMatched, // canonical Evidence JSON only
+      inputBytesChecked,outputBytesChecked,originalFilesCoverage,
       businessExecutionCorrectnessVerified:false,
     },
     boundaries:{
