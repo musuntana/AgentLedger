@@ -59,6 +59,6 @@ const server = createServer((req, res) => {
 const port = Number(process.env.AGENTLEDGER_DEPLOY_PORT || 4322);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw Error('AGENTLEDGER_DEPLOY_PORT must be 1..65535');
 server.listen(port, '127.0.0.1', () => {
-  console.log(`Compiled ${artifact.compiler}; ${contract.evm.bytecode.object.length / 2} bytes; source SHA-256 ${artifact.sourceSha256}`);
+  console.log(`Compiled ${artifact.compiler}; ${(artifact.bytecode.length - 2) / 2} bytes; source SHA-256 ${artifact.sourceSha256}`);
   console.log(`MetaMask deployment: http://127.0.0.1:${port} (Monad Testnet 10143 only)`);
 });
