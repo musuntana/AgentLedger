@@ -14,7 +14,9 @@ async function exercise(contract:string,taskId:string){
   const observation=await sdk.observe(contract,taskId);
   const unknown:"PaymentUnknown"=observation.status.state;
   const rpcWitness:"SINGLE_RPC"|"DUAL_RPC_MATCHED"=observation.rpcWitness;
-  void rpcWitness;
+  const sharedBlock:string|null=observation.rpcWitnessBlockNumber;
+  const sharedHash:string|null=observation.rpcWitnessBlockHash;
+  void [rpcWitness,sharedBlock,sharedHash];
   const fact=await sdk.verify(contract,taskId,{},{
     inputBytes:new Uint8Array([1,2]),outputBytes:new ArrayBuffer(8)
   });
