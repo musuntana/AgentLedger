@@ -327,3 +327,65 @@ test("oversized local files fail before any RPC and cannot be classified as netw
   });
   assert.equal(rpc.calls.length,0);
 });
+
+test("opt-in second RPC matches recorder task facts without upgrading payment",async t=>{
+  const first=await localRpc(t);
+  const second=await localRpc(t);
+  const sdk=createAgentLedgerVerifier({rpcUrl:first.url,witnessRpcUrl:second.url});
+  const observation=await sdk.observe(CONTRACT,ID);
+  assert.equal(observation.rpcWitness,"DUAL_RPC_MATCHED");
+  assert.equal(observation.status.state,"PaymentUnknown");
+  assert.equal(observation.finalityProven,false);
+  assert.ok(first.calls.includes("eth_call"));
+  assert.ok(second.calls.includes("eth_call"));
+  const evidence=await sdk.verify(CONTRACT,ID,payload);
+  assert.equal(evidence.rpcWitness,"DUAL_RPC_MATCHED");
+  assert.equal(evidence.match,true);
+  assert.equal(evidence.chargeAgain,false);
+});
+
+test("cross-RPC contradictory task status fails closed before Evidence is called valid",async t=>{
+  const first=await localRpc(t,{status:3});
+  const second=await localRpc(t,{status:2});
+  const sdk=createAgentLedgerVerifier({rpcUrl:first.url,witnessRpcUrl:second.url});
+  for(const [operation,call] of [
+    ["observe",()=>sdk.observe(CONTRACT,ID)],
+    ["verify",()=>sdk.verify(CONTRACT,ID,payload)],
+  ]){
+    await assert.rejects(call(),e=>{
+      assert.equal(e.name,"AgentLedgerSDKError");
+      assert.equal(e.code,"SDK_WITNESS_CONFLICT");
+      assert.equal(e.operation,operation);
+      assert.equal(e.retryable,false);
+      assert.equal(e.paymentStatus,"PaymentUnknown");
+      assert.equal(e.chargeAgain,false);
+      return true;
+    });
+  }
+});
+
+test("cross-RPC witness chain mismatch or outage never silently downgrades to single RPC",async t=>{
+  const first=await localRpc(t);
+  const wrong=await localRpc(t,{chainId:"0x1"});
+  const sdk=createAgentLedgerVerifier({rpcUrl:first.url,witnessRpcUrl:wrong.url});
+  await assert.rejects(()=>sdk.observe(CONTRACT,ID),e=>
+    e.code==="SDK_CHAIN_MISMATCH"&&e.chargeAgain===false);
+  const unavailable=createAgentLedgerVerifier({
+    rpcUrl:first.url,witnessRpcUrl:"http://127.0.0.1:1"
+  });
+  await assert.rejects(()=>unavailable.observe(CONTRACT,ID),e=>
+    e.code==="SDK_OBSERVATION_UNAVAILABLE"&&e.retryable===true&&e.chargeAgain===false);
+});
+
+test("witness URL trust and identical origin fail at construction",async t=>{
+  const rpc=await localRpc(t);
+  for(const witnessRpcUrl of [
+    rpc.url,"http://public.example","https://user:token@rpc.example",
+    "https://rpc.example/tenant","https://rpc.example/?key=secret",
+  ]){
+    assert.throws(()=>createAgentLedgerVerifier({rpcUrl:rpc.url,witnessRpcUrl}),
+      e=>e.operation==="create"&&!e.retryable&&e.chargeAgain===false);
+  }
+  const instance=createAgentLedgerVerifier({rpcUrl:rpc.url});
+  assert.equal((await instance.observe(CONTRACT,ID)).rpcWitness,"SINGLE_RPC");
+});
