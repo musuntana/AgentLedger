@@ -3,11 +3,18 @@
 import {createAgentLedgerVerifier,SDK_VERSION} from "../dist/index.mjs";
 import type {AgentLedgerSdkError} from "../dist/index.mjs";
 const sdk=createAgentLedgerVerifier({rpcUrl:"https://testnet-rpc.monad.xyz"});
+const crossChecked=createAgentLedgerVerifier({
+  rpcUrl:"https://testnet-rpc.monad.xyz",
+  witnessRpcUrl:"https://rpc2.example.org"
+});
+void crossChecked;
 const checkVersion:"0.2.0-alpha.3"=SDK_VERSION;
 void checkVersion;
 async function exercise(contract:string,taskId:string){
   const observation=await sdk.observe(contract,taskId);
   const unknown:"PaymentUnknown"=observation.status.state;
+  const rpcWitness:"SINGLE_RPC"|"DUAL_RPC_MATCHED"=observation.rpcWitness;
+  void rpcWitness;
   const fact=await sdk.verify(contract,taskId,{},{
     inputBytes:new Uint8Array([1,2]),outputBytes:new ArrayBuffer(8)
   });
