@@ -5,6 +5,9 @@
   "compatibility_date": "2026-10-17",
   "workers_dev": true,
   "minify": true,
+  "build": {
+    "command": "node tools/ensure-cloudflare-build.mjs"
+  },
   "assets": {
     "directory": "./out/cloudflare/public",
     "binding": "ASSETS",
@@ -14,5 +17,10 @@
   },
   "vars": {
     "MONAD_RPC_URL": "https://testnet-rpc.monad.xyz"
+  },
+  "previews": {
+    "vars": {
+      "MONAD_RPC_URL": "https://testnet-rpc.monad.xyz"
+    }
   }
 }
