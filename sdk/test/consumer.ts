@@ -39,7 +39,9 @@ function classify(e:unknown) {
   if(e instanceof Error&&"code" in e){
     const code=(e as AgentLedgerSdkError).code;
     const noCharge:false=(e as AgentLedgerSdkError).chargeAgain;
-    void [code,noCharge];
+    const stage:AgentLedgerSdkError["rpcStage"]=(e as AgentLedgerSdkError).rpcStage;
+    const role:AgentLedgerSdkError["rpcRole"]=(e as AgentLedgerSdkError).rpcRole;
+    void [code,noCharge,stage,role];
   }
 }
 void classify;
