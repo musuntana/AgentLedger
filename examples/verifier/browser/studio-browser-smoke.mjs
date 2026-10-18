@@ -88,6 +88,11 @@ try {
   assert(report.task.descriptionHash?.length===66,"descriptionHash absent");
   assert(report.task.taskId?.length===66,"taskId absent");
   assert(report.evidence.verification==="HASH_MATCHED","browser Evidence digest unverified");
+  assert(report.evidence.originalFilesCoverage==="BOTH_MATCHED","sample should verify both original files");
+  assert(report.evidence.inputBytesChecked===true && report.evidence.outputBytesChecked===true,
+    "original file verification coverage missing");
+  assert(await page.locator('#verification-matrix-body td[data-state="SOURCE_BYTES_MATCHED"]').count()===1,
+    "matrix did not distinguish fully matched original files");
   assert(report.payment.observedState==="PaymentUnknown","browser falsely reports Paid");
   assert(report.payment.paymentNonce===null,"simulated payment nonce fabricated");
   assert(report.rpc.contacted===false,"simulation reports unexpected public RPC");
