@@ -50,6 +50,8 @@ function freezeSnapshot(value) {
 }
 // Equal responses from separate endpoints are a consistency witness, not
 // independent provider identity, finality or historical block pinning.
+const BLOCK_HASH=/^0x[0-9a-fA-F]{64}$/;
+const BLOCK_HEIGHT=/^0x[0-9a-fA-F]+$/;
 const TASK_WITNESS_FIELDS=["chainId","contract","taskId","creator","payer","status",
   "statusValue","amountAtomic","maxBudgetAtomic","descriptionHash","settlementRef",
   "evidenceHash","createdAt","paidAt","provenAt"];
@@ -186,20 +188,61 @@ export function createAgentLedgerVerifier(options={}) {
   const chain=makeClient(rpcUrl);
   const witnessChain=witnessRpcUrl===null?null:makeClient(witnessRpcUrl);
   const rpcWitness=witnessChain?"DUAL_RPC_MATCHED":"SINGLE_RPC";
+  async function readTaskWitness(contract,taskId,operation) {
+    if(!witnessChain) {
+      return {task:await readTask(chain,contract,taskId),blockNumber:null,blockHash:null};
+    }
+    // Use a common historical height, not two implicit 'latest' reads.
+    // Each endpoint is checked before AND after eth_call against the same
+    // canonical block hash. This is point-in-time agreement, not finality.
+    const [primaryHead,witnessHead]=await Promise.all([
+      chain.getBlockNumber(),witnessChain.getBlockNumber()
+    ]);
+    const height=primaryHead<witnessHead?primaryHead:witnessHead;
+    const hexHeight="0x"+height.toString(16);
+    async function readHash(client) {
+      const block=await client.request({
+        method:"eth_getBlockByNumber",params:[hexHeight,false]
+      });
+      if(!block || typeof block.number!=="string" ||
+          !BLOCK_HEIGHT.test(block.number) || BigInt(block.number)!==height ||
+          !BLOCK_HASH.test(block.hash||""))
+        throw sdkError("SDK_OBSERVATION_UNAVAILABLE",operation,
+          "RPC historical block unavailable; PaymentUnknown, read-only recheck only",true);
+      return block.hash.toLowerCase();
+    }
+    const [firstHash,secondHash]=await Promise.all([
+      readHash(chain),readHash(witnessChain)
+    ]);
+    if(firstHash!==secondHash)
+      throw sdkError("SDK_WITNESS_CONFLICT",operation,
+        "RPC endpoints disagree on canonical block hash; PaymentUnknown, do not recharge");
+    const [primaryTask,secondaryTask]=await Promise.all([
+      readTask(chain,contract,taskId,{blockNumber:height}),
+      readTask(witnessChain,contract,taskId,{blockNumber:height}),
+    ]);
+    const [primaryAfter,secondaryAfter]=await Promise.all([
+      readHash(chain),readHash(witnessChain)
+    ]);
+    if(primaryAfter!==firstHash || secondaryAfter!==firstHash)
+      throw sdkError("SDK_WITNESS_CONFLICT",operation,
+        "RPC canonical block changed during observation; PaymentUnknown, do not recharge");
+    requireWitnessMatch(primaryTask,secondaryTask,TASK_WITNESS_FIELDS,operation);
+    return {task:primaryTask,blockNumber:height.toString(),blockHash:firstHash};
+  }
   return Object.freeze({
     sdkVersion:SDK_VERSION,
     capabilities:SDK_CAPABILITIES,
     async observe(contract,taskId){
       return observeSafely("observe",async()=>{
         validateLookup(contract,taskId);
-        const task=await readTask(chain,contract,taskId);
-        if(witnessChain) {
-          const second=await readTask(witnessChain,contract,taskId);
-          requireWitnessMatch(task,second,TASK_WITNESS_FIELDS,"observe");
-        }
+        const witnessed=await readTaskWitness(contract,taskId,"observe");
+        const {task}=witnessed;
         return freezeSnapshot({
           schemaVersion:SDK_SCHEMA,sdkVersion:SDK_VERSION,source:"RPC_READ_ONLY",
-          rpcWitness,task,status:projectPhase0({task,attempt:"NotEstablished"}),
+          rpcWitness,rpcWitnessBlockNumber:witnessed.blockNumber,
+          rpcWitnessBlockHash:witnessed.blockHash,
+          task,status:projectPhase0({task,attempt:"NotEstablished"}),
           paymentStatus:"PaymentUnknown",paymentVerified:false,
           publicTestnetAcceptance:"BLOCKED_UNLESS_SEPARATELY_REVIEWED",
           finalityProven:false,chargeAgain:false,executionAuthority:"ACP",
@@ -223,18 +266,17 @@ export function createAgentLedgerVerifier(options={}) {
         const evidenceSnapshot=JSON.parse(canonical);
         if(evidenceSnapshot.taskId!==taskId.toLowerCase())
           throw sdkError("SDK_EVIDENCE_MISMATCH","verify","Evidence task ID does not match the requested task");
-        const task=await readTask(chain,contract,taskId);
-        if(witnessChain) {
-          const second=await readTask(witnessChain,contract,taskId);
-          requireWitnessMatch(task,second,TASK_WITNESS_FIELDS,"verify");
-        }
+        const witnessed=await readTaskWitness(contract,taskId,"verify");
+        const {task}=witnessed;
         const matched=await verifyEvidence(evidenceSnapshot,task,inputSnapshot,outputSnapshot);
         return freezeSnapshot({
           ...matched,
           evidenceDigestMatched:true,
           originalFilesCoverage:originalFilesCoverage(matched.inputChecked,matched.outputChecked),
           schemaVersion:SDK_SCHEMA,sdkVersion:SDK_VERSION,
-          rpcWitness,source:"CHAIN_ANCHOR_PLUS_LOCAL_BYTES",evidenceHash:task.evidenceHash,
+          rpcWitness,rpcWitnessBlockNumber:witnessed.blockNumber,
+          rpcWitnessBlockHash:witnessed.blockHash,
+          source:"CHAIN_ANCHOR_PLUS_LOCAL_BYTES",evidenceHash:task.evidenceHash,
           paymentStatus:"PaymentUnknown",paymentVerified:false,
           finalityProven:false,chargeAgain:false,executionAuthority:"ACP",
           publicTestnetAcceptance:"BLOCKED_UNLESS_SEPARATELY_REVIEWED",
