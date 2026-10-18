@@ -13,7 +13,7 @@ export type AgentLedgerSdkErrorCode =
   |"SDK_INVALID_INPUT"|"SDK_INVALID_EVIDENCE"|"SDK_CHAIN_MISMATCH"
   |"SDK_EVIDENCE_MISMATCH"|"SDK_TASK_UNAVAILABLE"
   |"SDK_SETTLEMENT_INCONSISTENT"|"SDK_SETTLEMENT_PENDING"
-  |"SDK_OBSERVATION_UNAVAILABLE";
+  |"SDK_WITNESS_CONFLICT"|"SDK_OBSERVATION_UNAVAILABLE";
 export interface AgentLedgerSdkError extends Error {
   readonly name:"AgentLedgerSDKError";
   readonly code:AgentLedgerSdkErrorCode;
@@ -44,6 +44,8 @@ export interface ReadonlyBoundary {
   readonly finalityProven:false;
   readonly chargeAgain:false;
   readonly executionAuthority:"ACP";
+  /** Two configured RPC URLs agreeing is a witness, not independent provider verification or finality. */
+  readonly rpcWitness:"SINGLE_RPC"|"DUAL_RPC_MATCHED";
 }
 export interface ObserveResult extends ReadonlyBoundary {
   readonly source:"RPC_READ_ONLY";
@@ -114,4 +116,6 @@ export interface AgentLedgerReadOnlyVerifier {
 }
 export declare function createAgentLedgerVerifier(options?:{
   readonly rpcUrl?:string;
+  /** Optional second read-only RPC origin. No injected clients/transports. */
+  readonly witnessRpcUrl?:string;
 }):AgentLedgerReadOnlyVerifier;
