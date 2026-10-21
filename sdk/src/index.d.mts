@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-/** @agentledger/verify: private read-only alpha.3 public type contract.
+/** @agentledger/verify: read-only v0.1.0 public type contract.
  * No signer, payment retry, fixture parser, injected transport or ACP API.
  */
-export declare const SDK_VERSION: "0.2.0-alpha.3";
+export declare const SDK_VERSION: "0.1.0";
 export declare const SDK_CAPABILITIES: Readonly<{
   observe:true;verify:true;reconcile:true;readOnly:true;
   acceptPayment:false;charge:false;sign:false;mutateLedger:false;
@@ -44,7 +44,7 @@ export interface LedgerTask {
 }
 export interface ReadonlyBoundary {
   readonly schemaVersion:"agentledger.sdk.read-only.v1";
-  readonly sdkVersion:"0.2.0-alpha.3";
+  readonly sdkVersion:"0.1.0";
   readonly publicTestnetAcceptance:"BLOCKED_UNLESS_SEPARATELY_REVIEWED";
   readonly finalityProven:false;
   readonly chargeAgain:false;
@@ -114,7 +114,7 @@ export interface ReconcileResult extends ReadonlyBoundary {
   readonly note:string;
 }
 export interface AgentLedgerReadOnlyVerifier {
-  readonly sdkVersion:"0.2.0-alpha.3";
+  readonly sdkVersion:"0.1.0";
   readonly capabilities:typeof SDK_CAPABILITIES;
   observe(contract:string,taskId:string):Promise<ObserveResult>;
   verify(contract:string,taskId:string,evidence:unknown,options?:{

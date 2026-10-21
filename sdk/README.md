@@ -1,8 +1,43 @@
-# @agentledger/verify v0.2.0-alpha.3 — read-only Node SDK
+# ledger SDK — @agentledger/verify v0.1.0 — read-only Node SDK
 
-**Status: private pre-release.** This SDK has not been published to npm.
+**Status: GitHub prerelease, version 0.1.0.** Install the release archive
+below. This SDK has not been published to the npm registry.
 It is a **read-only** tool for Monad Testnet `eip155:10143`, *not*
 a payment, custody, AgentRun or public-Testnet-acceptance SDK.
+
+## Install (Node.js 22 or newer)
+
+Install the versioned release archive from your own project:
+
+```sh
+npm install https://github.com/musuntana/monad-hackathon/releases/download/sdk-v0.1.0/agentledger-verify-0.1.0.tgz
+```
+
+With npm 12, URL dependencies require an explicit opt-in. Use
+`npm install --allow-remote=root` with the same URL (and use that option
+for subsequent installs of the URL dependency), or download the archive,
+verify `SHA256SUMS`, and install the local `.tgz` file.
+
+The package name remains `@agentledger/verify` for compatibility. It is
+ESM-only; use `import` in an `.mjs` file or a project with `"type":"module"`.
+Dependencies are installed by npm. No repository checkout, Foundry,
+wallet, or SDK build tools are required to use the archive.
+
+```js
+import {createAgentLedgerVerifier, SDK_VERSION} from "@agentledger/verify";
+
+const verifier = createAgentLedgerVerifier({
+  rpcUrl: "https://testnet-rpc.monad.xyz"
+});
+console.log(SDK_VERSION); // "0.1.0"
+// Query an existing task using its deployed contract address and bytes32 ID:
+// const result = await verifier.observe(contractAddress, taskId);
+```
+
+The release includes `SHA256SUMS` for archive integrity verification.
+Availability of this software does not establish paid Testnet acceptance
+or chain finality. The package stays `private:true` to prevent accidental
+npm registry publication; installing its `.tgz` archive is supported.
 
 ## Stability and compatibility contract
 
@@ -20,6 +55,7 @@ npm install --ignore-scripts --no-audit --no-fund
 npm test
 npm run typecheck
 npm run packcheck
+npm run smoke
 ```
 
 ```js
@@ -167,10 +203,30 @@ reconciliation is `PaymentUnknown`, not proof of unpaid status.
 independently reviewed contract entries. **Public Testnet acceptance is
 BLOCKED**. Local Anvil and simulated journeys are valid software
 tests but cannot establish paid Testnet acceptance or chain finality.
-`private:true` prevents accidental npm publishing. SDK alpha promotion
+`private:true` prevents accidental npm registry publishing. Production promotion
 requires a reviewed deployed contract, genuine settlement, consistent
 evidence and an explicit production API review. ACP retains exclusive
 authority over Agent execution, leases, replay and outcomes.
 
 Full demonstration runbook:
 [Verification Studio demo acceptance](../docs/verification-studio-demo-acceptance.md).
+
+## Build an installable archive
+
+From the repository root:
+
+```sh
+npm ci --ignore-scripts --no-audit --no-fund
+npm --prefix sdk test
+npm --prefix sdk run typecheck
+npm --prefix sdk run packcheck
+npm --prefix sdk run smoke
+mkdir -p out/sdk
+(cd sdk && npm pack --pack-destination ../out/sdk)
+```
+
+`prepack` builds the runtime and declarations before creating the archive.
+The smoke check installs a real packed archive into a temporary consumer,
+runs the SDK runtime tests through the package name, and checks TypeScript
+imports against the installed declarations. Its RPCs are local fixtures;
+it does not sign, charge, or claim live Testnet acceptance.

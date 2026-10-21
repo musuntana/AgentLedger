@@ -3,7 +3,7 @@
 import {spawnSync} from "node:child_process";
 import {readFileSync} from "node:fs";
 const pkg=JSON.parse(readFileSync(new URL("../package.json",import.meta.url),"utf8"));
-if(pkg.private!==true||pkg.version!=="0.2.0-alpha.3"||
+if(pkg.private!==true||pkg.version!=="0.1.0"||
    pkg.exports?.["."]?.types!=="./dist/index.d.mts" ||
    pkg.exports?.["."]?.default!=="./dist/index.mjs")
   throw Error("Invalid SDK public package manifest or publication gate");
@@ -12,7 +12,13 @@ const run=spawnSync("npm",["pack","--dry-run","--json","--ignore-scripts"],{
   env:{...process.env,npm_config_update_notifier:"false"},
 });
 if(run.status!==0)throw Error("npm pack inspection failed: "+run.stderr.slice(0,1000));
-const metadata=JSON.parse(run.stdout);
+const packed=JSON.parse(run.stdout);
+// Older npm returns an array; npm 12 returns a package-name keyed object.
+const metadata=Array.isArray(packed)?packed:
+  packed!==null && typeof packed==="object"?Object.values(packed):[];
+if(metadata.length!==1 || !Array.isArray(metadata[0]?.files) ||
+   !metadata[0].files.every(file=>file!==null && typeof file?.path==="string"))
+  throw Error("Expected exactly one SDK package with a valid file list in npm pack metadata");
 const files=new Set(metadata[0].files.map(file=>file.path));
 for(const required of ["dist/index.mjs","dist/index.d.mts","README.md","package.json"]){
   if(!files.has(required))throw Error("SDK package missing "+required);

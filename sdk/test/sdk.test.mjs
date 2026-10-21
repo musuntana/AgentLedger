@@ -84,7 +84,7 @@ async function localRpc(t,{chainId="0x279f",status=3,evidence=payload,
 test("public package exports ONLY factory and metadata, no fixture parser or transport injector",async()=>{
   const exports=Object.keys(await import("../dist/index.mjs")).sort();
   assert.deepEqual(exports,["SDK_CAPABILITIES","SDK_VERSION","createAgentLedgerVerifier"]);
-  assert.equal(SDK_VERSION,"0.2.0-alpha.3");
+  assert.equal(SDK_VERSION,"0.1.0");
   for(const api of ["observe","verify","reconcile","readOnly"]) assert.equal(SDK_CAPABILITIES[api],true);
   for(const api of ["charge","sign","mutateLedger","manageAcp","executeAgent"])assert.equal(SDK_CAPABILITIES[api],false);
   const sdk=createAgentLedgerVerifier({rpcUrl:"http://127.0.0.1:18545"});

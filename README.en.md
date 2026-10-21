@@ -135,7 +135,7 @@ See the [presentation guide](slides/README.md) for exports. Participants handle 
 
 ## Read-only SDK
 
-`sdk` provides the unpublished `@agentledger/verify@0.2.0-alpha.3` package with `observe`, `verify` and receipt-only `reconcile`. Receipt reconciliation alone cannot establish verified payment. See the [SDK contract](sdk/README.md) for interfaces, error codes and constraints.
+`sdk` provides the GitHub prerelease `@agentledger/verify@0.1.0` package with `observe`, `verify` and receipt-only `reconcile`. Receipt reconciliation alone cannot establish verified payment. See [SDK installation and API](sdk/README.md) for the install command, interfaces, error codes and constraints.
 
 ## Verification commands and current limits
 

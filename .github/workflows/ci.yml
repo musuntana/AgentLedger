@@ -40,6 +40,7 @@ jobs:
         run: |
           npm --prefix sdk run typecheck
           npm --prefix sdk run packcheck
+          npm --prefix sdk run smoke
       - name: Offline readiness check
         run: node tools/onsite-check.mjs
       - name: Portable judge handoff check (offline, no publication)
