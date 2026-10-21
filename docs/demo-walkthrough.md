@@ -2,6 +2,14 @@
 
 Start the project with `npm run dev`, open <http://127.0.0.1:4322/demo>, and click **开始完整演示**. Keep MetaMask closed unless demonstrating the separate wallet workspace. The guided walkthrough only reads public-chain state in its final step.
 
+## Public online demo
+
+**Hosted guided route:** [AgentLedger /demo](https://monad-hackathon.musuntana.workers.dev/demo). No wallet is needed for the first six steps; the seventh step, if selected, performs a real read-only Monad Testnet lookup. For slides, open the [Chinese pitch](https://monad-hackathon.musuntana.workers.dev/pitch/) or [English pitch](https://monad-hackathon.musuntana.workers.dev/pitch/en/); for file and task checks, open [Studio](https://monad-hackathon.musuntana.workers.dev/studio). The [Pocket companion](https://monad-hackathon.musuntana.workers.dev/pocket/) is read-only.
+
+The separately available [Testnet workbench](https://monad-hackathon.musuntana.workers.dev/) and [native-MON experiment](https://monad-hackathon.musuntana.workers.dev/mon) can require actual MetaMask approvals and test MON; do not present them as part of the wallet-free demonstration. Hosted and localhost origins cannot share wallet transaction journals. The public link is supplied for navigation, **not evidence of independently verified hosted availability, settlement, RPC success or finality**.
+
+To use the local fallback, run `npm run dev` and open <http://127.0.0.1:4322/demo>. Existing local walkthrough steps and failure handling remain valid.
+
 ## Three-minute route
 
 1. **Task record, 20 seconds:** explain that a task ID and SHA-256 bind the exact input bytes. The banner says LOCAL SIMULATION. Registration does not authorize execution or spending.
