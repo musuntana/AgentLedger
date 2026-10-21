@@ -2,11 +2,27 @@
 
 仓库已提供 Worker 入口、静态资源构建脚本和 `wrangler.jsonc`。本地的两个 Node 服务在云端合并为同一域名下的网页与只读接口，无需在 Worker 中启动监听端口。
 
+## 公网演示入口
+
+**当前提供的演示域名：** [https://monad-hackathon.musuntana.workers.dev/](https://monad-hackathon.musuntana.workers.dev/)（Worker 标识 `monad-hackathon`，GitHub 源码仓库为 `musuntana/AgentLedger`）。
+
+| 地址 | 功能 |
+| --- | --- |
+| [完整导览 /demo](https://monad-hackathon.musuntana.workers.dev/demo) | 免钱包模拟演示＋可选真实只读 Testnet 查询 |
+| [验证室 /studio](https://monad-hackathon.musuntana.workers.dev/studio) | 文件哈希核验与任务只读观察 |
+| [工作台 /](https://monad-hackathon.musuntana.workers.dev/) | 钱包签名创建测试网任务 |
+| [MON /mon](https://monad-hackathon.musuntana.workers.dev/mon) | 需逐笔签名的测试 MON 实验 |
+| [中文讲稿 /pitch/](https://monad-hackathon.musuntana.workers.dev/pitch/) / [English /pitch/en/](https://monad-hackathon.musuntana.workers.dev/pitch/en/) | 在线路演 |
+| [Pocket /pocket/](https://monad-hackathon.musuntana.workers.dev/pocket/) | 只读伴随网页 |
+| [健康接口 /api/healthz](https://monad-hackathon.musuntana.workers.dev/api/healthz) | 只表示 Worker 服务应答，不证实 Monad RPC 可用 |
+
+以上 URL 依据仓库路由生成；**本次未独立完成公网 HTTP、RPC、钱包与支付验收**。部署是否成功应以 Cloudflare 构建日志、实际网页与 API 调用为准。操作路线见[在线演示指南](online-demo.md)。
+
 ## 在创建页面填写
 
 | 字段 | 填写内容 |
 | --- | --- |
-| 仓库 | `musuntana/monad-hackathon` |
+| 仓库 | `musuntana/AgentLedger`（Worker 名仍为 `monad-hackathon`） |
 | 项目名称 | `monad-hackathon`，须与 `wrangler.jsonc` 一致 |
 | 构建命令 | `npm run build:cloudflare` |
 | 部署命令 | `npx wrangler deploy` |
@@ -53,7 +69,7 @@ npm run build:cloudflare
 npx wrangler deploy --dry-run --outdir out/cloudflare/bundle
 ```
 
-本次已完成构建及 Wrangler 4.151.1 离线打包，Worker 压缩后约 109 KiB。该结果仅说明构建配置与打包通过，**没有执行 Cloudflare 上传、云端验收、应用测试或钱包交易**。
+历史离线构建记录：使用 Wrangler 4.151.1 成功打包，Worker 压缩后约 109 KiB。该记录只反映当时的构建配置，**不能证明当前公网访问或 RPC/钱包/支付验收通过**。本次文档更新未执行新的云端或链上验收。
 
 在 Cloudflare 创建项目并完成首次部署后，应以平台构建日志和实际访问结果判断是否上线成功。应用测试与公开链验收仍为独立步骤。
 
