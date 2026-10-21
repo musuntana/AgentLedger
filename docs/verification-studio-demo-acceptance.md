@@ -1,7 +1,7 @@
 # Verification Studio — Phase 0 demo acceptance
 
 **Target:** `examples/verifier/` (local read-only app) and
-`sdk/@agentledger/verify@0.2.0-alpha.2` (private source preview).
+`sdk/@agentledger/verify@0.1.0` (private source preview).
 **Safety:** every walkthrough scenario is LOCAL SIMULATION. No browser
 wallet, no charge, no chain write, no ACP run mutation and no real Monad
 Testnet payment acceptance.

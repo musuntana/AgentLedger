@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * AgentLedger read-only SDK (private alpha). Public surface intentionally
+ * ledger read-only SDK (preview). Public surface intentionally
  * limited to factory + immutable metadata. No wallet, fixture parser,
  * payment retries, write transport or ACP execution authority.
  *
@@ -13,7 +13,7 @@ import { verifyEvidence, canonicalEvidence } from "../../examples/verifier/publi
 import { projectPhase0 } from "../../phase0/status.mjs";
 import { verifyLive, NETWORK, USDC_CONTRACT } from "../../tools/settlement.mjs";
 
-export const SDK_VERSION="0.2.0-alpha.3";
+export const SDK_VERSION="0.1.0";
 export const SDK_CAPABILITIES=Object.freeze({
   observe:true,verify:true,reconcile:true,readOnly:true,
   acceptPayment:false,charge:false,sign:false,mutateLedger:false,

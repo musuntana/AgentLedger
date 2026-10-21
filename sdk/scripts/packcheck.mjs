@@ -3,7 +3,7 @@
 import {spawnSync} from "node:child_process";
 import {readFileSync} from "node:fs";
 const pkg=JSON.parse(readFileSync(new URL("../package.json",import.meta.url),"utf8"));
-if(pkg.private!==true||pkg.version!=="0.2.0-alpha.3"||
+if(pkg.private!==true||pkg.version!=="0.1.0"||
    pkg.exports?.["."]?.types!=="./dist/index.d.mts" ||
    pkg.exports?.["."]?.default!=="./dist/index.mjs")
   throw Error("Invalid SDK public package manifest or publication gate");

@@ -8,7 +8,7 @@ const crossChecked=createAgentLedgerVerifier({
   witnessRpcUrl:"https://rpc2.example.org"
 });
 void crossChecked;
-const checkVersion:"0.2.0-alpha.3"=SDK_VERSION;
+const checkVersion:"0.1.0"=SDK_VERSION;
 void checkVersion;
 async function exercise(contract:string,taskId:string){
   const observation=await sdk.observe(contract,taskId);

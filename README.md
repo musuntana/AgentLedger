@@ -135,7 +135,7 @@ npm run build:judge:en
 
 ## 只读开发工具包
 
-`sdk` 提供尚未发布的 `@agentledger/verify@0.2.0-alpha.3`，包含 `observe`、`verify` 和仅核对回执的 `reconcile`。回执核对本身不能将支付状态升级为已验证；接口、错误码和约束见[工具包说明](sdk/README.md)。
+`sdk` 提供可通过 GitHub 预发行归档安装的 `@agentledger/verify@0.1.0`，包含 `observe`、`verify` 和仅核对回执的 `reconcile`。回执核对本身不能将支付状态升级为已验证；安装命令、接口、错误码和约束见[工具包说明](sdk/README.md)。
 
 ## 验证命令与当前边界
 
