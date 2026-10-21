@@ -6,6 +6,25 @@ AgentLedger 是基于 Monad 测试网的黑客松原型，用于记录任务、�
 
 **当前状态：实验原型，尚未达到生产可用标准。MON 集成与最近的页面改动尚未完成运行时验收。**
 
+## 在线演示（Cloudflare Workers）
+
+**公开演示：** [AgentLedger 在线入口](https://monad-hackathon.musuntana.workers.dev/) · [免钱包完整导览](https://monad-hackathon.musuntana.workers.dev/demo)
+
+| 功能 | 在线地址 | 说明 |
+| --- | --- | --- |
+| 完整导览 | [演示 /demo](https://monad-hackathon.musuntana.workers.dev/demo) | 前六步为本地模拟＋浏览器真实哈希计算；第七步可选真实 Testnet 只读查询 |
+| 验证工作室 | [Studio /studio](https://monad-hackathon.musuntana.workers.dev/studio) | 文件哈希核验和测试网任务只读查看 |
+| 测试网工作台 | [Workbench /](https://monad-hackathon.musuntana.workers.dev/) | 钱包签名部署合约、创建任务 |
+| 原生 MON 实验 | [MON /mon](https://monad-hackathon.musuntana.workers.dev/mon) | 需明确同意并逐笔签名的测试 MON 转账实验 |
+| 中文 / 英文讲稿 | [中文 /pitch/](https://monad-hackathon.musuntana.workers.dev/pitch/) · [English /pitch/en/](https://monad-hackathon.musuntana.workers.dev/pitch/en/) | 在线路演幻灯片 |
+| Pocket | [Pocket /pocket/](https://monad-hackathon.musuntana.workers.dev/pocket/) | 移动端/网页只读演示 |
+
+**推荐操作：**从 /demo 开始，展示任务记录 → 付款声明（仍为 PaymentUnknown）→ 浏览器文本处理与 SHA-256 核验 → 篡改拒绝 → 丢失响应不重复付款。网络可用时再进行可选的第七步 Monad Testnet 真实只读查询。需要写链或 MON 转账时另行连接 MetaMask；不要在免钱包演示中触发真实交易。
+
+**能力边界：**公网网页不等于真实支付成功或生产可用。合约 Paid 是记录者声明，Proven 是摘要锚定，均不独立证明 USDC 付款、Agent 执行正确或链上最终性。Worker 只提供静态资源和只读 API，不保管私钥。钱包日志按浏览器来源隔离，本地 127.0.0.1 与公网域名不能自动互相恢复交易。
+
+该公网地址由项目方提供，**本次文档更新未独立验收线上可访问性、RPC 或钱包交易**。详细步骤见[在线演示指南](docs/online-demo.md)和[演示讲解稿](docs/demo-walkthrough.md)。
+
 ## 本地启动
 
 需要 Node.js 22 或更高版本。运行 Python 测试时，另需 Python 3 和 `pytest`。
@@ -42,7 +61,7 @@ npm run dev
 
 公开演示无需开启访问保护；需要团队登录限制时再配置 Cloudflare Access。构建环境需要 Node.js 22 或更新版本，无需提供钱包私钥。网页和只读接口部署到同一域名；本地交易记录不会迁移到新域名。
 
-构建和离线打包已完成，尚未上传或验收云端部署。详细范围和配置见 [Cloudflare 部署说明](docs/cloudflare-deployment.md)。
+公开演示 URL 已列出，但当前托管状态与 RPC 可用性仍需独立验收。详细范围和配置见 [Cloudflare 部署说明](docs/cloudflare-deployment.md)。
 
 ## 先看免钱包演示
 
