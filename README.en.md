@@ -6,6 +6,25 @@ AgentLedger is a Monad Testnet hackathon prototype for recording tasks, observin
 
 **Status: experimental prototype, not production-ready. The MON integration and recent UI changes still require runtime acceptance.**
 
+## Online demo (Cloudflare Workers)
+
+**Public entry:** [AgentLedger online](https://monad-hackathon.musuntana.workers.dev/) · [wallet-free walkthrough](https://monad-hackathon.musuntana.workers.dev/demo)
+
+| Surface | Online URL | Purpose |
+| --- | --- | --- |
+| Guided demo | [/demo](https://monad-hackathon.musuntana.workers.dev/demo) | First six steps use local simulation and real browser hashing; optional seventh step performs a real read-only Testnet query |
+| Verification Studio | [/studio](https://monad-hackathon.musuntana.workers.dev/studio) | Local file/hash verification and read-only Testnet task inspection |
+| Testnet workbench | [/](https://monad-hackathon.musuntana.workers.dev/) | Wallet-signed deployment and task creation |
+| Native MON experiment | [/mon](https://monad-hackathon.musuntana.workers.dev/mon) | Separately authorized, individually signed test-MON transactions |
+| Judge pitches | [Chinese](https://monad-hackathon.musuntana.workers.dev/pitch/) · [English](https://monad-hackathon.musuntana.workers.dev/pitch/en/) | Online presentation slides |
+| Pocket companion | [/pocket/](https://monad-hackathon.musuntana.workers.dev/pocket/) | Read-only mobile/web experience |
+
+**Demo route:** Open /demo first: task identity → recorder Paid claim (still PaymentUnknown) → local text processing and SHA-256 verification → tamper rejection → lost acknowledgement with no automatic recharge. Step seven is an optional real read-only Monad Testnet query. Use MetaMask only for separately explained wallet-signed Testnet operations.
+
+**Boundaries:** A public website does not establish real USDC/x402 settlement, correct Agent execution, payment finality or production readiness. Paid is a recorder assertion, Proven is a digest anchor. The Worker serves assets and read-only APIs, not server-side payments or private keys. Browser journals are origin-scoped; localhost transactions do not automatically migrate to this domain.
+
+The public URL was provided for this documentation update. **Hosted reachability, live RPC calls and wallet transactions were not independently accepted during this edit.** See the [online guide (Chinese)](docs/online-demo.md) and [presenter script](docs/demo-walkthrough.md).
+
 ## Run locally
 
 Use Node.js 22 or newer. Python tests also require Python 3 and `pytest`.
@@ -42,7 +61,7 @@ Connect this repository in Cloudflare, select production branch `master` and use
 
 For a public demo, leave Cloudflare Access off; enable it for restricted team access. Use Node.js 22 or newer for the build. No wallet private key is needed. Pages and read-only APIs share one origin; local transaction journals do not migrate to that origin.
 
-The build and offline bundle have completed; no Cloudflare upload or hosted acceptance has run. See the [deployment guide](docs/cloudflare-deployment.md) for scope and configuration.
+The public demo URL is documented, but current hosted status and RPC availability still require independent acceptance. See the [deployment guide](docs/cloudflare-deployment.md) for scope and configuration.
 
 ## Start with the wallet-free demo
 
