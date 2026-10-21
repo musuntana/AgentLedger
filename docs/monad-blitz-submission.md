@@ -12,6 +12,12 @@ AgentLedger 展示 Agent 任务的**创建事实、支付观察与证据字节�
 
 **当前公开验收边界：** 本地演示和 Anvil 回归可验证；`phase0/reviewed-testnet-deployments.json` 尚无审核条目，真实 Monad Testnet USDC 付款验收为 **BLOCKED_NO_REVIEWED_DEPLOYMENT**。合约 Paid 是 Recorder 声明，Proven 是摘要锚定；字节哈希相同不代表执行正确或支付最终确定。
 
+## 补充：公开在线演示
+
+在线评委入口：[AgentLedger 免钱包完整导览](https://monad-hackathon.musuntana.workers.dev/demo)；无需现场安装 Node.js。推荐先展示 [中文讲稿](https://monad-hackathon.musuntana.workers.dev/pitch/) 或 [英文讲稿](https://monad-hackathon.musuntana.workers.dev/pitch/en/)，然后 /demo 六步本地模拟；可选第七步才做真实 Testnet 只读查询。单独的 [Studio](https://monad-hackathon.musuntana.workers.dev/studio) 支持文件核验，[/mon](https://monad-hackathon.musuntana.workers.dev/mon) 是需要钱包确认的测试 MON 实验。
+
+公开 URL 不代表已完成公网验收或真实 USDC/x402 支付。2026-10-17 的 Monad Blitz 上海活动提交说明是历史记录；新增演示地址不等于重新提交活动。见[在线演示指南](online-demo.md)。
+
 ## 演示入口（请在现场本机执行）
 
 | 入口 | 操作 | 权限与网络 |
