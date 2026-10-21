@@ -2,7 +2,7 @@
 
 [中文](README.md) | English
 
-AgentLedger is a Monad Testnet hackathon prototype for recording tasks, observing payment state and verifying file evidence. It includes a wallet-free demo, a read-only Studio, a wallet workbench and a separate native-MON payment experiment.
+**AgentLedger — Pay → Execute → Prove** is an experimental AI Agent task and payment-evidence ledger on Monad Testnet. It records task identity, observes payment claims without treating unknown outcomes as failures, verifies SHA-256 evidence, and demonstrates recovery without automatic duplicate charges. Explore a wallet-free guided demo, read-only verification Studio, Testnet wallet workbench, and separate native-MON experiment.
 
 **Status: experimental prototype, not production-ready. The MON integration and recent UI changes still require runtime acceptance.**
 
