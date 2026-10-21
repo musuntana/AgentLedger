@@ -13,6 +13,11 @@ Install the versioned release archive from your own project:
 npm install https://github.com/musuntana/monad-hackathon/releases/download/sdk-v0.1.0/agentledger-verify-0.1.0.tgz
 ```
 
+With npm 12, URL dependencies require an explicit opt-in. Use
+`npm install --allow-remote=root` with the same URL (and use that option
+for subsequent installs of the URL dependency), or download the archive,
+verify `SHA256SUMS`, and install the local `.tgz` file.
+
 The package name remains `@agentledger/verify` for compatibility. It is
 ESM-only; use `import` in an `.mjs` file or a project with `"type":"module"`.
 Dependencies are installed by npm. No repository checkout, Foundry,
