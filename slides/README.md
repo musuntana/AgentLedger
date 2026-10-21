@@ -7,6 +7,12 @@ There are **two presentations**, both included with the portable project sources
 | `judge.md` | Seven-slide judge pitch: product, four-click demo, failure semantics and what remains unverified | ~3 minutes |
 | `slides.md` | Engineering appendix: SDK, ABI/identity, evidence, test gates and roadmap | ~10–15 minutes |
 
+## Online demo and hosted slides
+
+For remote judges, open [Chinese pitch](https://monad-hackathon.musuntana.workers.dev/pitch/) or [English pitch](https://monad-hackathon.musuntana.workers.dev/pitch/en/), then the [wallet-free guided demo](https://monad-hackathon.musuntana.workers.dev/demo). A separate [Verification Studio](https://monad-hackathon.musuntana.workers.dev/studio) and [Pocket companion](https://monad-hackathon.musuntana.workers.dev/pocket/) support read-only checks. The first six guided steps are local simulation and browser calculations; the seventh optional step uses read-only Monad Testnet RPC.
+
+These public links are provided for navigation and **were not independently checked for reachability or funded payment acceptance in this documentation change**. Existing links inside the development slide source may still point to localhost; use these public URLs when presenting on another device. Never claim validated USDC settlement or payment finality from the hosted UI.
+
 ## View the concise pitch
 
 ```bash
